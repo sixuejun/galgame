@@ -96,6 +96,7 @@
     "pixi.js": "^8.17.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "screenfull": "^6.0.2",
     "toastr": "^2.1.4",
     "vue": "^3.5.30",
     "vue-final-modal": "^4.5.5",
