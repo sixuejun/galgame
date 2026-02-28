@@ -196,66 +196,78 @@ body {
   animation: danmaku-scroll linear forwards;
 }
 
-/* === 2048 (dark theme) === */
-.distressed-border-2048 {
-  border: 2px solid var(--vn-border);
-  box-shadow:
-    inset 0 0 20px rgba(0, 0, 0, 0.2),
-    0 0 8px rgba(0, 0, 0, 0.15);
+/* === 2048 Grid === */
+.grid-2048 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: rgba(90, 79, 64, 0.35);
+  border-radius: 4px;
+  padding: 6px;
 }
-
-.ink-text-2048 {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-@keyframes tile-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes tile-pop {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.12);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.tile-new-2048 {
-  animation: tile-appear 0.2s ease-out;
-}
-
-.tile-merged-2048 {
-  animation: tile-pop 0.3s ease-out;
-}
-
-.vn-2048-btn {
+.tile-2048 {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
   font-family: monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  padding: 0.35rem 0.75rem;
-  border: 1px solid var(--vn-border);
-  color: var(--vn-fg);
-  background: rgba(58, 51, 44, 0.5);
-  cursor: pointer;
-  transition: all 0.15s;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+  font-size: 1.1rem;
 }
-
-.vn-2048-btn:hover {
-  background: var(--rust);
+.tile-0 {
+  background: rgba(74, 64, 53, 0.25);
+}
+.tile-2 {
+  background: rgba(212, 197, 160, 0.2);
+  color: var(--vn-fg);
+}
+.tile-4 {
+  background: rgba(212, 197, 160, 0.3);
+  color: var(--vn-fg);
+}
+.tile-8 {
+  background: rgba(196, 162, 101, 0.4);
+  color: var(--vn-fg);
+}
+.tile-16 {
+  background: rgba(196, 162, 101, 0.55);
+  color: var(--vn-fg);
+}
+.tile-32 {
+  background: rgba(160, 82, 45, 0.4);
   color: var(--paper-light);
-  border-color: var(--rust);
+}
+.tile-64 {
+  background: rgba(160, 82, 45, 0.55);
+  color: var(--paper-light);
+}
+.tile-128 {
+  background: rgba(139, 69, 19, 0.5);
+  color: var(--paper-light);
+  font-size: 1rem;
+}
+.tile-256 {
+  background: rgba(139, 69, 19, 0.65);
+  color: var(--paper-light);
+  font-size: 1rem;
+}
+.tile-512 {
+  background: rgba(139, 69, 19, 0.8);
+  color: var(--paper-light);
+  font-size: 0.95rem;
+}
+.tile-1024 {
+  background: rgba(107, 52, 16, 0.8);
+  color: var(--paper-light);
+  font-size: 0.85rem;
+}
+.tile-2048 {
+  background: rgba(107, 52, 16, 0.95);
+  color: #ffd700;
+  font-size: 0.85rem;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
 }
 
 /* === Stock Chart === */

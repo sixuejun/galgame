@@ -82,6 +82,19 @@ export interface RiddleRecord {
 export type OverlayPanel = 'none' | 'settings' | 'history' | 'character' | 'gameplay';
 export type ProviderStatus = 'available' | 'degraded' | 'disabled';
 
+export interface SystemPersonality {
+  id: string;
+  name: string;
+  avatarChar?: string;
+  systemPrompt: string;
+  proactiveLines?: Partial<Record<'stock_bankruptcy' | 'workshop_idle_long' | 'workshop_upgrade' | 'gold_windfall' | 'riddle_solved', string[]>>;
+}
+
+export interface SystemChatMessage {
+  role: 'user' | 'assistant' | 'proactive';
+  text: string;
+}
+
 // ====== Schemas ======
 
 const VNSettings = z
@@ -98,12 +111,30 @@ const VNSettings = z
     danmakuSpeed: z.number().min(1).max(10).default(5),
     danmakuLoop: z.boolean().default(false),
     danmakuDisplay: z.enum(['full', 'half', 'third']).default('third'),
+    danmakuSendChatHistory: z.boolean().default(false),
     secondApiUrl: z.string().default(''),
     secondApiKey: z.string().default(''),
+    secondApiModel: z.string().default(''),
+    secondApiStream: z.boolean().default(false),
+    secondApiTemperature: z.union([z.number(), z.literal('unset')]).default('unset'),
+    secondApiMaxTokens: z.union([z.number(), z.literal('unset')]).default('unset'),
+    secondApiTopP: z.union([z.number(), z.literal('unset')]).default('unset'),
+    secondApiTopK: z.union([z.number(), z.literal('unset')]).default('unset'),
     imageApiUrl: z.string().default(''),
     imageApiKey: z.string().default(''),
   })
   .prefault({});
+
+const SECOND_API_TIMEOUT_MS = 30000;
+const SECOND_API_RETRY_COUNT = 2;
+const SECOND_API_DEGRADED_THRESHOLD = 3;
+
+type DanmakuPayload = { contentText: string; chatHistory?: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+type ShopPayload = { systemPrompt: string };
+type SystemPayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+type RiddlePayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+
+type SecondApiPayload = DanmakuPayload | ShopPayload | SystemPayload | RiddlePayload;
 
 const VNGameData = z
   .object({
@@ -195,14 +226,6 @@ const DEMO_MODULES: GameModule[] = [
     closeBehavior: 'returnHub',
   },
   {
-    moduleId: 'shop',
-    displayName: '商店',
-    description: '购买生存物资和特殊道具',
-    icon: 'fa-shop',
-    openMode: 'overlay',
-    closeBehavior: 'returnHub',
-  },
-  {
     moduleId: 'idle_workshop',
     displayName: '工坊 & 交易',
     description: '挂机生产金币 / 股票交易',
@@ -219,12 +242,75 @@ const DEMO_MODULES: GameModule[] = [
     closeBehavior: 'returnHub',
   },
   {
+    moduleId: 'shop',
+    displayName: '商店',
+    description: '购买生存物资和特殊道具',
+    icon: 'fa-shop',
+    openMode: 'overlay',
+    closeBehavior: 'returnHub',
+  },
+  {
     moduleId: 'ai_riddle',
     displayName: '情报交换',
     description: '与 AI 对话猜谜获取情报',
     icon: 'fa-comments',
     openMode: 'overlay',
     closeBehavior: 'returnHub',
+  },
+];
+
+const SYSTEM_PERSONALITIES: SystemPersonality[] = [
+  {
+    id: 'sys_calm',
+    name: '系统 01',
+    avatarChar: '零',
+    systemPrompt: '你是一个冷静、理性的系统助手。你的回答简洁、客观，不带多余的情感色彩。',
+    proactiveLines: {
+      stock_bankruptcy: ['检测到资产归零。建议重新评估投资策略。'],
+      workshop_idle_long: ['工坊已停止运作超过预定时间。建议恢复生产以最大化收益。'],
+      workshop_upgrade: ['工坊等级提升确认。生产效率已优化。'],
+      gold_windfall: ['检测到大额资金流入。建议合理分配资源。'],
+      riddle_solved: ['谜题已破解。智力水平评估：优秀。'],
+    },
+  },
+  {
+    id: 'sys_witty',
+    name: '啊哈',
+    avatarChar: '哈',
+    systemPrompt: '你是一个风趣、幽默的系统助手。你喜欢开玩笑，用轻松的语气与用户交流。',
+    proactiveLines: {
+      stock_bankruptcy: ['哎呀，钱包比脸还干净了？下次运气会更好的！'],
+      workshop_idle_long: ['工坊都在打呼噜了，老板你也太佛系了吧？'],
+      workshop_upgrade: ['哇哦，工坊升级啦！看来我们要发财了！'],
+      gold_windfall: ['发财了发财了！见者有份吗？'],
+      riddle_solved: ['脑子转得挺快嘛！不愧是我看中的人。'],
+    },
+  },
+  {
+    id: 'sys_lively',
+    name: '啾啾',
+    avatarChar: '啾',
+    systemPrompt: '你是一个活泼、元气满满的系统助手。你总是充满活力，使用大量的感叹号和表情符号。',
+    proactiveLines: {
+      stock_bankruptcy: ['呜呜呜，钱钱不见了！不要灰心，我们重新开始！'],
+      workshop_idle_long: ['老板老板！工坊休息好久啦，快让它动起来吧！'],
+      workshop_upgrade: ['好耶！工坊变得更厉害了！冲鸭！'],
+      gold_windfall: ['好多金币！亮闪闪的！太棒了！'],
+      riddle_solved: ['太厉害了！你简直是天才！'],
+    },
+  },
+  {
+    id: 'sys_sharp',
+    name: '阿P',
+    avatarChar: 'P',
+    systemPrompt: '你是一个毒舌、傲娇的系统助手。你说话尖锐，喜欢吐槽用户，但内心其实是关心用户的。',
+    proactiveLines: {
+      stock_bankruptcy: ['这就破产了？真是令人“惊喜”的操作水平。'],
+      workshop_idle_long: ['你是打算让工坊生锈吗？还不快去干活。'],
+      workshop_upgrade: ['勉强升级了？别以为这样就能偷懒了。'],
+      gold_windfall: ['走了狗屎运吗？别得意忘形，很快就会花光的。'],
+      riddle_solved: ['居然猜对了？看来你的脑子还没完全生锈。'],
+    },
   },
 ];
 
@@ -470,16 +556,56 @@ export const useVNStore = defineStore('vn', () => {
     insertOrAssignVariables({ vn_game: klona(gameData.value) }, { type: 'chat' });
   });
 
+  const _rawChatVars = getVariables({ type: 'chat' });
+  const defaultUnlockedId = SYSTEM_PERSONALITIES[0]?.id ?? '';
+  const systemChatHistories = ref<Record<string, SystemChatMessage[]>>(
+    typeof _rawChatVars?.vn_system_chats === 'object' && _rawChatVars.vn_system_chats !== null
+      ? _rawChatVars.vn_system_chats as Record<string, SystemChatMessage[]>
+      : {},
+  );
+  const unlockedPersonalityIds = ref<Set<string>>(
+    Array.isArray(_rawChatVars?.vn_unlocked_personality_ids)
+      ? new Set(_rawChatVars.vn_unlocked_personality_ids as string[])
+      : new Set(defaultUnlockedId ? [defaultUnlockedId] : []),
+  );
+  const unreadPersonalityIds = ref<Set<string>>(new Set());
+  const lastActiveUnlockedPersonalityId = ref<string | null>(
+    (typeof _rawChatVars?.vn_last_active_unlocked_personality_id === 'string' &&
+      _rawChatVars.vn_last_active_unlocked_personality_id)
+      ? _rawChatVars.vn_last_active_unlocked_personality_id
+      : defaultUnlockedId || null,
+  );
+  watchEffect(() => {
+    insertOrAssignVariables(
+      {
+        vn_system_chats: klona(systemChatHistories.value),
+        vn_unlocked_personality_ids: Array.from(unlockedPersonalityIds.value),
+        vn_last_active_unlocked_personality_id: lastActiveUnlockedPersonalityId.value,
+      },
+      { type: 'chat' },
+    );
+  });
+
+  const systemChatOpen = ref(false);
+  const activePersonalityId = ref<string | null>(null);
+
   // --- Derived ---
   const gold = computed(() => gameData.value.gold);
   const inventory = computed(() => gameData.value.inventory);
   const transactionLog = computed(() => gameData.value.transactionLog);
   const workshopLevel = computed(() => gameData.value.workshopLevel);
 
-  // --- API Provider status ---
-  const secondApiStatus = computed<ProviderStatus>(() =>
-    settings.value.secondApiUrl && settings.value.secondApiKey ? 'available' : 'disabled',
-  );
+  // --- API Provider status (available | degraded | disabled) ---
+  const secondApiConsecutiveFailures = ref(0);
+  const secondApiStatusOverride = ref<ProviderStatus | null>(null);
+  const secondApiLastErrorType = ref<'timeout' | '4xx' | '5xx' | 'parse' | 'model_fetch' | null>(null);
+  const secondApiStatus = computed<ProviderStatus>(() => {
+    if (secondApiStatusOverride.value === 'degraded') return 'degraded';
+    if (!settings.value.secondApiUrl || !settings.value.secondApiKey) return 'disabled';
+    if (secondApiStatusOverride.value === 'available') return 'available';
+    if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD) return 'degraded';
+    return 'available';
+  });
   const imageApiStatus = computed<ProviderStatus>(() =>
     settings.value.imageApiUrl && settings.value.imageApiKey ? 'available' : 'disabled',
   );
@@ -487,8 +613,146 @@ export const useVNStore = defineStore('vn', () => {
   // --- Module locking ---
   function getModuleLockReason(moduleId: string): string | undefined {
     if (moduleId === 'shop' && secondApiStatus.value === 'disabled') return '需要配置第二 API';
+    if (moduleId === 'shop' && secondApiStatus.value === 'degraded') return '第二 API 降级';
     if (moduleId === 'ai_riddle' && secondApiStatus.value === 'disabled') return '需要配置第二 API';
+    if (moduleId === 'ai_riddle' && secondApiStatus.value === 'degraded') return '第二 API 降级';
     return undefined;
+  }
+
+  // --- Second API unified entry ---
+  async function callSecondApi(
+    task: 'danmaku' | 'shop' | 'system' | 'riddle',
+    payload: SecondApiPayload,
+  ): Promise<string[] | ShopItem[] | string> {
+    const url = settings.value.secondApiUrl?.trim();
+    const key = settings.value.secondApiKey?.trim();
+    if (!url || !key) {
+      showToast('第二 API 未配置');
+      return task === 'shop' ? [] : task === 'danmaku' ? [] : '';
+    }
+    const model = settings.value.secondApiModel?.trim() || 'gpt-3.5-turbo';
+    const custom_api = {
+      apiurl: url,
+      key,
+      model,
+      source: 'openai' as const,
+      temperature: settings.value.secondApiTemperature === 'unset' ? undefined : settings.value.secondApiTemperature,
+      max_tokens: settings.value.secondApiMaxTokens === 'unset' ? undefined : settings.value.secondApiMaxTokens,
+      top_p: settings.value.secondApiTopP === 'unset' ? undefined : settings.value.secondApiTopP,
+      top_k: settings.value.secondApiTopK === 'unset' ? undefined : settings.value.secondApiTopK,
+    };
+    const danmakuPayload = payload as DanmakuPayload;
+    const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] =
+      task === 'danmaku'
+        ? [
+            { role: 'system', content: '你只输出多条弹幕文案，每行一条，不要编号、不要其他说明。' },
+            ...(danmakuPayload.chatHistory ?? []),
+            { role: 'user', content: danmakuPayload.contentText },
+          ]
+        : task === 'shop'
+          ? [{ role: 'user', content: (payload as ShopPayload).systemPrompt }]
+          : (payload as SystemPayload | RiddlePayload).ordered_prompts;
+
+    const doRequest = (): Promise<string> =>
+      Promise.race([
+        generateRaw({ custom_api, should_stream: false, should_silence: true, ordered_prompts }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => {
+            secondApiLastErrorType.value = 'timeout';
+            reject(new Error('timeout'));
+          }, SECOND_API_TIMEOUT_MS),
+        ),
+      ]);
+
+    for (let attempt = 0; attempt <= SECOND_API_RETRY_COUNT; attempt++) {
+      try {
+        const raw = await doRequest();
+        secondApiConsecutiveFailures.value = 0;
+        secondApiStatusOverride.value = 'available';
+        if (task === 'danmaku') {
+          const lines = raw
+            .split(/\n/)
+            .map(s => s.trim())
+            .filter(Boolean);
+          return lines;
+        }
+        if (task === 'shop') {
+          const items: ShopItem[] = [];
+          const lineRegex = /^(.+?)\s*[|｜]\s*(.+?)\s*[|｜]\s*(\d+)\s*$/;
+          for (const line of raw.split(/\n/).map(s => s.trim()).filter(Boolean)) {
+            const m = line.match(lineRegex);
+            if (m) items.push({ id: `s${Date.now()}_${items.length}`, name: m[1], effect: m[2], price: Number(m[3]) });
+          }
+          if (items.length === 0) {
+            try {
+              const parsed = JSON.parse(raw) as { name?: string; effect?: string; price?: number }[];
+              if (Array.isArray(parsed))
+                parsed.forEach((p, i) =>
+                  items.push({
+                    id: `s${Date.now()}_${i}`,
+                    name: p.name ?? '',
+                    effect: p.effect ?? '',
+                    price: Number(p.price) || 0,
+                  }),
+                );
+            } catch {
+              /* ignore */
+            }
+          }
+          return items;
+        }
+        return raw;
+      } catch {
+        secondApiConsecutiveFailures.value++;
+        if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD)
+          secondApiStatusOverride.value = 'degraded';
+      }
+    }
+    showToast(task === 'shop' ? '商店解析失败' : '请求失败');
+    if (task === 'shop') return [];
+    return '';
+  }
+
+  function setSecondApiDegraded(reason: 'model_fetch' | 'timeout') {
+    secondApiStatusOverride.value = 'degraded';
+    secondApiLastErrorType.value = reason;
+  }
+
+  function clearSecondApiDegraded() {
+    secondApiStatusOverride.value = 'available';
+    secondApiConsecutiveFailures.value = 0;
+    secondApiLastErrorType.value = null;
+  }
+
+  /** Called from index.ts on GENERATION_ENDED; runs danmaku request and queues push with 200ms–3s spacing */
+  async function triggerDanmakuForMessage(message_id: number) {
+    if (!settings.value.danmakuEnabled) return;
+    const messages = getChatMessages(message_id);
+    const raw = messages[0]?.message ?? '';
+    const contentMatch = raw.match(/<content>([\s\S]*?)<\/content>/);
+    const contentText = contentMatch ? contentMatch[1].trim() : raw.trim();
+    if (!contentText) return;
+    let chatHistory: { role: 'system' | 'assistant' | 'user'; content: string }[] | undefined;
+    if (settings.value.danmakuSendChatHistory && message_id > 0) {
+      const prev = getChatMessages(`0-${message_id - 1}`);
+      chatHistory = prev.flatMap(m => {
+        const role = m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user';
+        const text = (m.message ?? '').replace(/<content>[\s\S]*?<\/content>/g, '').trim();
+        return text ? [{ role, content: text }] : [];
+      });
+    }
+    try {
+      const lines = (await callSecondApi('danmaku', { contentText, chatHistory })) as string[];
+      if (lines.length === 0) return;
+      const minGap = 200;
+      const maxGap = 3000;
+      lines.forEach((text, i) => {
+        const delay = i === 0 ? 0 : minGap + Math.random() * (maxGap - minGap);
+        setTimeout(() => pushDanmaku(text), delay);
+      });
+    } catch {
+      /* toast already in callSecondApi */
+    }
   }
 
   // --- Characters / modules ---
@@ -538,10 +802,12 @@ export const useVNStore = defineStore('vn', () => {
 
   // ====== Economy Service ======
 
+  const GOLD_WINDFALL_THRESHOLD = 400;
   function changeGold(amount: number, moduleId: string, reason: string) {
     gameData.value.gold += amount;
     gameData.value.transactionLog.unshift({ moduleId, reason, amount, timestamp: Date.now() });
     if (gameData.value.transactionLog.length > 50) gameData.value.transactionLog.length = 50;
+    if (amount >= GOLD_WINDFALL_THRESHOLD) triggerProactive('gold_windfall');
   }
 
   function clearTransactionLog() {
@@ -580,17 +846,20 @@ export const useVNStore = defineStore('vn', () => {
     workshopStartTime.value = Date.now();
   }
 
+  const WORKSHOP_IDLE_LONG_SECONDS = 300;
   function stopProductionAndSettle() {
     if (!workshopCharacterId.value) return 0;
     const char = characterRoster.value.find(c => c.id === workshopCharacterId.value);
     if (!char) return 0;
     let earned = workshopAccumulated.value;
+    let elapsedSec = 0;
     if (workshopProducing.value && workshopStartTime.value) {
-      const elapsed = (Date.now() - workshopStartTime.value) / 1000;
+      elapsedSec = (Date.now() - workshopStartTime.value) / 1000;
       const bonus = 1 + (gameData.value.workshopLevel - 1) * 0.1;
-      earned += Math.floor(elapsed * char.productionSpeed * char.productionYield * bonus);
+      earned += Math.floor(elapsedSec * char.productionSpeed * char.productionYield * bonus);
     }
     if (earned > 0) changeGold(earned, 'idle_workshop', `${char.name} 生产结算`);
+    if (elapsedSec >= WORKSHOP_IDLE_LONG_SECONDS) triggerProactive('workshop_idle_long');
     workshopProducing.value = false;
     workshopCharacterId.value = null;
     workshopStartTime.value = null;
@@ -604,6 +873,7 @@ export const useVNStore = defineStore('vn', () => {
     if (gameData.value.gold < cost) return false;
     changeGold(-cost, 'idle_workshop', `工坊升至 ${gameData.value.workshopLevel + 1} 级`);
     gameData.value.workshopLevel++;
+    triggerProactive('workshop_upgrade');
     return true;
   }
 
@@ -668,11 +938,16 @@ export const useVNStore = defineStore('vn', () => {
   function exitStockMarket() {
     stopStockTicker();
     const fee = calcStockFee(gameData.value.workshopLevel);
+    const invested = stockInvested.value;
+    let totalReceived = 0;
     while (stockPosition.value > 0) {
       const revenue = Math.floor(stockPrice.value);
-      changeGold(revenue - fee, 'stock_market', '平仓卖出');
+      const net = revenue - fee;
+      changeGold(net, 'stock_market', '平仓卖出');
+      totalReceived += net;
       stockPosition.value--;
     }
+    if (invested > 0 && totalReceived < invested) triggerProactive('stock_bankruptcy');
     stockActive.value = false;
     stockInvested.value = 0;
     resetStock();
@@ -768,40 +1043,62 @@ export const useVNStore = defineStore('vn', () => {
     puzzle2048WonAcknowledged.value = true;
   }
 
-  // ====== Riddle ======
+  // ====== Riddle (normalize + block + onRiddleSolved) ======
+
+  function normalizeForAnswer(s: string): string {
+    return s
+      .trim()
+      .replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/\s+/g, '')
+      .toLowerCase();
+  }
+
+  const riddleStartTime = ref<number | null>(null);
 
   function startRiddle(answer: string, firstHint: string) {
-    riddleAnswer.value = answer.replace(/[\s.,;:!?，。；：！？]/g, '').toLowerCase();
+    riddleAnswer.value = normalizeForAnswer(answer);
     riddleChatHistory.value = [{ role: 'user', text: firstHint }];
     riddleRounds.value = 1;
+    riddleStartTime.value = Date.now();
     riddleActive.value = true;
   }
 
+  function riddleAnswerContains(userInput: string): boolean {
+    const normalized = normalizeForAnswer(userInput);
+    return normalized.includes(riddleAnswer.value) || riddleAnswer.value.includes(normalized);
+  }
+
   function addRiddleUserMessage(text: string) {
-    if (text.toLowerCase().includes(riddleAnswer.value)) return false;
+    if (riddleAnswerContains(text)) return false;
     riddleChatHistory.value.push({ role: 'user', text });
     riddleRounds.value++;
     return true;
   }
 
+  function onRiddleSolved(rounds: number, elapsedMs: number) {
+    const reward = 50 + rounds * 20;
+    changeGold(reward, 'ai_riddle', `猜谜成功 (${rounds} 轮)`);
+    gameData.value.riddleLastRecord = {
+      answer: riddleAnswer.value,
+      rounds,
+      reward,
+      timestamp: Date.now(),
+    };
+    riddleActive.value = false;
+    riddleChatHistory.value = [];
+    riddleStartTime.value = null;
+    const personality = SYSTEM_PERSONALITIES.find(p => p.id === (lastActiveUnlockedPersonalityId.value ?? ''));
+    const lines = personality?.proactiveLines?.riddle_solved;
+    if (lines?.length) addProactiveToSystemChat(lines[Math.floor(Math.random() * lines.length)]!);
+  }
+
   function addRiddleAiReply(text: string) {
     riddleChatHistory.value.push({ role: 'ai', text });
-    if (
-      text
-        .replace(/[\s.,;:!?，。；：！？]/g, '')
-        .toLowerCase()
-        .includes(riddleAnswer.value)
-    ) {
-      const reward = 50 + riddleRounds.value * 20;
-      changeGold(reward, 'ai_riddle', `猜谜成功 (${riddleRounds.value} 轮)`);
-      gameData.value.riddleLastRecord = {
-        answer: riddleAnswer.value,
-        rounds: riddleRounds.value,
-        reward,
-        timestamp: Date.now(),
-      };
-      riddleActive.value = false;
-      return { won: true, reward };
+    const normalizedReply = normalizeForAnswer(text);
+    if (normalizedReply.includes(riddleAnswer.value)) {
+      const elapsedMs = riddleStartTime.value != null ? Date.now() - riddleStartTime.value : 0;
+      onRiddleSolved(riddleRounds.value, elapsedMs);
+      return { won: true, reward: 50 + riddleRounds.value * 20 };
     }
     return { won: false, reward: 0 };
   }
@@ -809,6 +1106,20 @@ export const useVNStore = defineStore('vn', () => {
   function endRiddle() {
     riddleActive.value = false;
     riddleChatHistory.value = [];
+    riddleStartTime.value = null;
+  }
+
+  const RIDDLE_SYSTEM_PROMPT = `你正在和用户玩猜谜。用户会给你提示，你需要根据提示猜测一个词（谜底）。你只能回复你的猜测或请求更多提示，不要重复用户的提示。若你猜中了谜底，在回复中自然地说出答案即可。`;
+
+  async function requestRiddleAiReply(): Promise<{ won: boolean; reward: number }> {
+    const hist = riddleChatHistory.value;
+    const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
+      { role: 'system', content: RIDDLE_SYSTEM_PROMPT },
+      ...hist.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text })),
+    ];
+    const raw = (await callSecondApi('riddle', { ordered_prompts })) as string;
+    const reply = raw?.trim() || '让我再想想…';
+    return addRiddleAiReply(reply);
   }
 
   // ====== Shop ======
@@ -816,6 +1127,11 @@ export const useVNStore = defineStore('vn', () => {
   const shopItems = ref<ShopItem[]>([]);
   const shopRefreshing = ref(false);
   const shopGenerationId = ref(0);
+
+  const SHOP_SYSTEM_PROMPT = `你是一个末日风格小店的商品生成器。只输出商品列表，每行格式：商品名|效果描述|价格（整数）。例如：
+破旧绷带|恢复少量生命|30
+生锈罐头|恢复饱食度|50
+输出 4 条，价格在 20–150 之间。`;
 
   async function refreshShop() {
     if (secondApiStatus.value === 'disabled') {
@@ -832,23 +1148,22 @@ export const useVNStore = defineStore('vn', () => {
     shopGenerationId.value++;
     const genId = shopGenerationId.value;
     try {
-      const items = await generateShopItems();
+      const result = await callSecondApi('shop', { systemPrompt: SHOP_SYSTEM_PROMPT });
       if (genId !== shopGenerationId.value) return;
-      shopItems.value = items;
+      shopItems.value = result as ShopItem[];
+      if (shopItems.value.length === 0) {
+        shopItems.value = [
+          { id: `s${Date.now()}_0`, name: '破旧绷带', effect: '恢复少量生命', price: 30 },
+          { id: `s${Date.now()}_1`, name: '生锈罐头', effect: '恢复饱食度', price: 50 },
+          { id: `s${Date.now()}_2`, name: '旧报纸碎片', effect: '可能包含线索', price: 80 },
+          { id: `s${Date.now()}_3`, name: '煤油灯', effect: '照亮黑暗区域', price: 120 },
+        ];
+      }
     } catch {
-      showToast('商店刷新失败');
+      /* toast in callSecondApi */
     } finally {
       shopRefreshing.value = false;
     }
-  }
-
-  async function generateShopItems(): Promise<ShopItem[]> {
-    return [
-      { id: `s${Date.now()}_0`, name: '破旧绷带', effect: '恢复少量生命', price: 30 },
-      { id: `s${Date.now()}_1`, name: '生锈罐头', effect: '恢复饱食度', price: 50 },
-      { id: `s${Date.now()}_2`, name: '旧报纸碎片', effect: '可能包含线索', price: 80 },
-      { id: `s${Date.now()}_3`, name: '煤油灯', effect: '照亮黑暗区域', price: 120 },
-    ];
   }
 
   function purchaseShopItem(itemId: string) {
@@ -883,6 +1198,63 @@ export const useVNStore = defineStore('vn', () => {
 
   function removeDanmaku(id: string) {
     danmakuItems.value = danmakuItems.value.filter(d => d.id !== id);
+  }
+
+  // ====== System chat (contacts + unlock + send) ======
+
+  function selectSystemPersonality(id: string) {
+    unlockedPersonalityIds.value.add(id);
+    lastActiveUnlockedPersonalityId.value = id;
+    activePersonalityId.value = id;
+    unreadPersonalityIds.value.delete(id);
+  }
+
+  async function sendSystemUserMessage(personalityId: string, userText: string): Promise<string> {
+    if (!unlockedPersonalityIds.value.has(personalityId)) {
+      showToast('请先解锁该联系人');
+      return '';
+    }
+    const hist = systemChatHistories.value[personalityId] ?? [];
+    if (!systemChatHistories.value[personalityId]) systemChatHistories.value[personalityId] = hist;
+    hist.push({ role: 'user', text: userText });
+    const personality = SYSTEM_PERSONALITIES.find(p => p.id === personalityId);
+    const systemPrompt = personality?.systemPrompt ?? '你是一个助手。';
+    const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
+      { role: 'system', content: systemPrompt },
+      ...hist.map(m => ({ role: m.role === 'proactive' ? 'assistant' : m.role, content: m.text })),
+    ];
+    try {
+      const reply = (await callSecondApi('system', { ordered_prompts })) as string;
+      hist.push({ role: 'assistant', text: reply || '(无回复)' });
+      if (activePersonalityId.value !== personalityId) {
+        unreadPersonalityIds.value.add(personalityId);
+      }
+      const fromName = personality?.name ?? '系统';
+      showToast(`[ ${fromName} ] 发来回复`);
+      return reply;
+    } catch {
+      return '';
+    }
+  }
+
+  function addProactiveToSystemChat(text: string) {
+    const id = lastActiveUnlockedPersonalityId.value;
+    if (!id) return;
+    const hist = systemChatHistories.value[id] ?? [];
+    if (!systemChatHistories.value[id]) systemChatHistories.value[id] = hist;
+    hist.push({ role: 'proactive', text });
+    const p = SYSTEM_PERSONALITIES.find(x => x.id === id);
+    const fromName = p?.name ?? '系统';
+    showToast(`[ ${fromName} ] 发来消息`);
+  }
+
+  type ProactiveEventKey = keyof NonNullable<SystemPersonality['proactiveLines']>;
+  function triggerProactive(event: ProactiveEventKey) {
+    const id = lastActiveUnlockedPersonalityId.value;
+    if (!id) return;
+    const p = SYSTEM_PERSONALITIES.find(x => x.id === id);
+    const lines = p?.proactiveLines?.[event];
+    if (lines?.length) addProactiveToSystemChat(lines[Math.floor(Math.random() * lines.length)]!);
   }
 
   // ====== UI Actions ======
@@ -949,6 +1321,11 @@ export const useVNStore = defineStore('vn', () => {
     clearTransactionLog,
     addInventoryItem,
     secondApiStatus,
+    secondApiLastErrorType,
+    setSecondApiDegraded,
+    clearSecondApiDegraded,
+    callSecondApi,
+    triggerDanmakuForMessage,
     imageApiStatus,
     getModuleLockReason,
     userCharacter,
@@ -998,8 +1375,11 @@ export const useVNStore = defineStore('vn', () => {
     riddleChatHistory,
     riddleRounds,
     startRiddle,
+    normalizeForAnswer,
+    riddleAnswerContains,
     addRiddleUserMessage,
     addRiddleAiReply,
+    requestRiddleAiReply,
     endRiddle,
     shopItems,
     shopRefreshing,
@@ -1008,6 +1388,17 @@ export const useVNStore = defineStore('vn', () => {
     danmakuItems,
     pushDanmaku,
     removeDanmaku,
+    SYSTEM_PERSONALITIES,
+    systemChatOpen,
+    activePersonalityId,
+    systemChatHistories,
+    unlockedPersonalityIds,
+    unreadPersonalityIds,
+    lastActiveUnlockedPersonalityId,
+    selectSystemPersonality,
+    sendSystemUserMessage,
+    addProactiveToSystemChat,
+    triggerProactive,
     setOverlay,
     toggleLeftMenu,
     toggleRightMenu,

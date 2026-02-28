@@ -85,6 +85,13 @@
             />
           </div>
           <template v-if="store.settings.danmakuEnabled">
+            <div class="flex items-center justify-between py-2">
+              <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">发送时附带聊天记录</span>
+              <ToggleSwitch
+                :checked="store.settings.danmakuSendChatHistory"
+                @update="v => store.updateSettings({ danmakuSendChatHistory: v })"
+              />
+            </div>
             <SliderRow
               label="弹幕速度"
               :value="store.settings.danmakuSpeed"
@@ -147,10 +154,10 @@
               <span class="text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">第二 API</span>
               <span class="text-xs" :class="'provider-' + store.secondApiStatus">
                 <i class="fa-solid fa-circle" style="font-size: 6px; margin-right: 4px" />
-                {{ store.secondApiStatus === 'available' ? '已连接' : '未配置' }}
+                {{ store.secondApiStatus === 'available' ? '可用' : store.secondApiStatus === 'degraded' ? '降级' : '未配置' }}
               </span>
             </div>
-            <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">用于商店刷新、弹幕生成等功能</p>
+            <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">用于商店刷新、弹幕生成、系统/猜谜等功能</p>
             <input
               class="vn-input mb-2"
               placeholder="API URL"
@@ -164,15 +171,93 @@
               :value="store.settings.secondApiKey"
               @input="store.updateSettings({ secondApiKey: ($event.target as HTMLInputElement).value })"
             />
+            <div class="flex gap-2 mb-2">
+              <select
+                class="vn-input flex-1 text-xs"
+                :value="store.settings.secondApiModel"
+                @change="store.updateSettings({ secondApiModel: ($event.target as HTMLSelectElement).value })"
+              >
+                <option value="">选择模型</option>
+                <option v-for="m in secondApiModelList" :key="m" :value="m">{{ m }}</option>
+              </select>
+              <button
+                class="px-2 py-1 border text-xs cursor-pointer whitespace-nowrap"
+                style="border-color: rgba(90,79,64,0.4); border-radius: 2px; color: var(--vn-muted)"
+                :disabled="!store.settings.secondApiUrl?.trim() || loadingModelList"
+                @click="fetchSecondApiModelList"
+              >
+                {{ loadingModelList ? '…' : '拉取模型' }}
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-3 mb-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs" style="color: var(--vn-muted)">流式</span>
+                <ToggleSwitch
+                  :checked="store.settings.secondApiStream"
+                  @update="v => store.updateSettings({ secondApiStream: v })"
+                />
+              </div>
+              <SliderRow
+                label="温度"
+                :value="typeof store.settings.secondApiTemperature === 'number' ? store.settings.secondApiTemperature : 0.7"
+                :min="0"
+                :max="2"
+                :step="0.1"
+                @update="v => store.updateSettings({ secondApiTemperature: v })"
+              />
+              <div class="flex items-center gap-1 text-xs">
+                <span style="color: var(--vn-muted)">最大长度</span>
+                <input
+                  type="number"
+                  class="vn-input w-16 text-center"
+                  :value="typeof store.settings.secondApiMaxTokens === 'number' ? store.settings.secondApiMaxTokens : ''"
+                  placeholder="unset"
+                  min="1"
+                  @input="e => { const v = (e.target as HTMLInputElement).value; store.updateSettings({ secondApiMaxTokens: v === '' ? 'unset' : Number(v) }); }"
+                />
+              </div>
+              <div class="flex items-center gap-1 text-xs">
+                <span style="color: var(--vn-muted)">Top P</span>
+                <input
+                  type="number"
+                  class="vn-input w-14 text-center"
+                  :value="typeof store.settings.secondApiTopP === 'number' ? store.settings.secondApiTopP : ''"
+                  placeholder="unset"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  @input="e => { const v = (e.target as HTMLInputElement).value; store.updateSettings({ secondApiTopP: v === '' ? 'unset' : Number(v) }); }"
+                />
+              </div>
+              <div class="flex items-center gap-1 text-xs">
+                <span style="color: var(--vn-muted)">Top K</span>
+                <input
+                  type="number"
+                  class="vn-input w-14 text-center"
+                  :value="typeof store.settings.secondApiTopK === 'number' ? store.settings.secondApiTopK : ''"
+                  placeholder="unset"
+                  min="0"
+                  @input="e => { const v = (e.target as HTMLInputElement).value; store.updateSettings({ secondApiTopK: v === '' ? 'unset' : Number(v) }); }"
+                />
+              </div>
+            </div>
+            <button
+              v-if="store.secondApiStatus === 'degraded'"
+              class="mb-2 px-2 py-1 border text-xs cursor-pointer"
+              style="border-color: var(--rust); border-radius: 2px; color: var(--rust)"
+              @click="store.clearSecondApiDegraded()"
+            >
+              清除降级状态
+            </button>
             <button
               class="flex items-center gap-1.5 px-2.5 py-1 border text-xs cursor-pointer transition-all"
               :style="{
-                borderColor: store.secondApiStatus === 'available' ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
-                color: store.secondApiStatus === 'available' ? 'var(--vn-fg)' : 'var(--vn-muted)',
+                borderColor: (store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded') ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
+                color: (store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded') ? 'var(--vn-fg)' : 'var(--vn-muted)',
                 borderRadius: '2px',
-                opacity: store.secondApiStatus === 'available' ? 1 : 0.4,
+                opacity: (store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded') ? 1 : 0.4,
               }"
-              :disabled="store.secondApiStatus !== 'available' || testingSecondApi"
+              :disabled="store.secondApiStatus === 'disabled' || testingSecondApi"
               @click="testSecondApi"
             >
               <i
@@ -288,6 +373,24 @@ const store = useVNStore();
 
 const testingSecondApi = ref(false);
 const secondApiTestResult = ref<string | null>(null);
+const secondApiModelList = ref<string[]>([]);
+const loadingModelList = ref(false);
+
+async function fetchSecondApiModelList() {
+  const url = store.settings.secondApiUrl?.trim();
+  const key = store.settings.secondApiKey?.trim();
+  if (!url) return;
+  loadingModelList.value = true;
+  try {
+    const list = await getModelList({ apiurl: url, key });
+    secondApiModelList.value = list ?? [];
+  } catch {
+    store.setSecondApiDegraded('model_fetch');
+    secondApiModelList.value = [];
+  } finally {
+    loadingModelList.value = false;
+  }
+}
 const testingImageApi = ref(false);
 const imageApiTestResult = ref<string | null>(null);
 
@@ -384,6 +487,13 @@ function handleReset() {
     danmakuSpeed: 5,
     danmakuLoop: false,
     danmakuDisplay: 'third',
+    danmakuSendChatHistory: false,
+    secondApiModel: '',
+    secondApiStream: false,
+    secondApiTemperature: 'unset',
+    secondApiMaxTokens: 'unset',
+    secondApiTopP: 'unset',
+    secondApiTopK: 'unset',
   });
 }
 </script>

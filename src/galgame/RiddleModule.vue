@@ -110,38 +110,34 @@ function handleStart() {
   if (!canStart.value) return;
   store.startRiddle(answerInput.value.trim(), firstHint.value.trim());
   phase.value = 'playing';
-  simulateAiReply();
+  requestAiReply();
 }
 
 function handleSendMessage() {
   if (!userInput.value.trim() || aiThinking.value) return;
+  if (store.riddleAnswerContains(userInput.value.trim())) {
+    blocked.value = true;
+    setTimeout(() => { blocked.value = false; }, 2000);
+    return;
+  }
   const ok = store.addRiddleUserMessage(userInput.value.trim());
   if (!ok) { blocked.value = true; setTimeout(() => { blocked.value = false; }, 2000); return; }
   userInput.value = '';
-  simulateAiReply();
+  requestAiReply();
 }
 
-async function simulateAiReply() {
+async function requestAiReply() {
   aiThinking.value = true;
-  await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
-  if (!store.riddleActive) { aiThinking.value = false; return; }
-
-  const replies = [
-    '这个提示很有意思……让我想想，是不是和某种自然现象有关？',
-    '嗯……我觉得可能跟某种日常物品相关。能再给一个线索吗？',
-    '根据你给的信息，我猜测这可能和文字游戏有关……',
-    `等等，我想到了——是不是「${store.riddleAnswer}」？`,
-    '这个谜题有点难度。能告诉我它属于什么类别吗？',
-    '我有一个猜测，但不太确定。再给我一个提示？',
-  ];
-  const reply = store.riddleRounds > 3
-    ? replies[3]
-    : replies[Math.floor(Math.random() * (replies.length - 1))];
-  const result = store.addRiddleAiReply(reply);
-  aiThinking.value = false;
-  if (result.won) {
-    store.showToast(`猜谜成功！获得 ${result.reward}G`);
-    phase.value = 'setup';
+  try {
+    const result = await store.requestRiddleAiReply();
+    if (result.won) {
+      store.showToast(`猜谜成功！获得 ${result.reward}G`);
+      phase.value = 'setup';
+    }
+  } catch {
+    store.showToast('请求失败');
+  } finally {
+    aiThinking.value = false;
   }
 }
 </script>

@@ -121,5 +121,13 @@ watch(
   },
 );
 
-onMounted(() => console.info(`[galgame] Mounted streaming VN interface for floor ${context.message_id}`));
+onMounted(() => {
+  (window as unknown as { __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState =
+    (window as unknown as { __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState ?? {
+      activeGenerationMesId: null,
+      mainStore: null,
+    };
+  ((window as unknown as { __galgameState: { mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState as { mainStore: ReturnType<typeof useVNStore> | null }).mainStore = store;
+  console.info(`[galgame] Mounted streaming VN interface for floor ${context.message_id}`);
+});
 </script>
