@@ -87,12 +87,52 @@ export interface SystemPersonality {
   name: string;
   avatarChar?: string;
   systemPrompt: string;
-  proactiveLines?: Partial<Record<'stock_bankruptcy' | 'workshop_idle_long' | 'workshop_upgrade' | 'gold_windfall' | 'riddle_solved', string[]>>;
+  proactiveLines?: Partial<
+    Record<'stock_bankruptcy' | 'workshop_idle_long' | 'workshop_upgrade' | 'gold_windfall' | 'riddle_solved', string[]>
+  >;
 }
 
 export interface SystemChatMessage {
   role: 'user' | 'assistant' | 'proactive';
   text: string;
+}
+
+// ====== Summary System Types ======
+
+export interface SmallSummary {
+  id: string;
+  content: string;
+  rounds: string;
+  timestamp: number;
+}
+
+export interface BigSummary {
+  id: string;
+  content: string;
+  rounds: string;
+  timestamp: number;
+  smallCount: number;
+}
+
+export interface SecondApiGeneration {
+  id: string;
+  type: 'danmaku' | 'summary' | 'imageTag' | 'variable';
+  content: string;
+  timestamp: number;
+  messageId: number;
+  inserted: boolean;
+}
+
+// ====== Worldbook Enhancement Types ======
+
+export interface WorldbookEntryEnhanced {
+  uid: number;
+  enabled: boolean;
+  targetApi: 'main' | 'second' | 'both';
+  autoControl: boolean;
+  linkedFeature?: 'danmaku' | 'imageGen' | 'summary';
+  // Original worldbook entry fields will be preserved
+  [key: string]: any;
 }
 
 // ====== Schemas ======
@@ -122,19 +162,59 @@ const VNSettings = z
     secondApiTopK: z.union([z.number(), z.literal('unset')]).default('unset'),
     imageApiUrl: z.string().default(''),
     imageApiKey: z.string().default(''),
+    imageGenEnabled: z.boolean().default(false),
+    backgroundGenEnabled: z.boolean().default(false),
+    cgGenEnabled: z.boolean().default(false),
+    // Summary system config
+    summarySmallInterval: z.number().min(1).max(50).default(5),
+    summaryBigThreshold: z.number().min(2).max(20).default(6),
+    summaryAutoEnabled: z.boolean().default(true),
+    summaryApiType: z.enum(['main', 'second']).default('second'),
+    // API task config
+    apiTaskDanmaku: z.enum(['main', 'second', 'disabled']).default('second'),
+    apiTaskSummary: z.enum(['main', 'second', 'disabled']).default('second'),
+    apiTaskImageTag: z.enum(['main', 'second', 'disabled']).default('second'),
+    apiTaskVariable: z.enum(['main', 'second', 'disabled']).default('main'),
   })
   .prefault({});
 
 const SECOND_API_TIMEOUT_MS = 30000;
+
+// 生图：通过前端助手事件与外部插件通信，无需自配 API
+export const ImageGenEventType = {
+  GENERATE_IMAGE_REQUEST: 'generate-image-request',
+  GENERATE_IMAGE_RESPONSE: 'generate-image-response',
+} as const;
+
+export type ImageGenRequestData = {
+  id: string;
+  prompt: string;
+  width: number | null;
+  height: number | null;
+};
+
+export type ImageGenResponseData = {
+  id: string;
+  success: boolean;
+  imageData?: string;
+  error?: string;
+  prompt?: string;
+  change?: string;
+};
 const SECOND_API_RETRY_COUNT = 2;
 const SECOND_API_DEGRADED_THRESHOLD = 3;
 
-type DanmakuPayload = { contentText: string; chatHistory?: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+type DanmakuPayload = {
+  contentText: string;
+  chatHistory?: { role: 'system' | 'assistant' | 'user'; content: string }[];
+};
 type ShopPayload = { systemPrompt: string };
 type SystemPayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
 type RiddlePayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+type SummaryPayload = { systemPrompt: string };
+type ImageTagPayload = { systemPrompt: string };
 
-type SecondApiPayload = DanmakuPayload | ShopPayload | SystemPayload | RiddlePayload;
+type SecondApiPayload = DanmakuPayload | ShopPayload | SystemPayload | RiddlePayload | SummaryPayload | ImageTagPayload;
 
 const VNGameData = z
   .object({
@@ -160,9 +240,7 @@ const VNGameData = z
       )
       .default([]),
     workshopLevel: z.number().min(1).max(10).default(1),
-    puzzle2048Tiles: z
-      .array(z.object({ value: z.number(), row: z.number(), col: z.number() }))
-      .default([]),
+    puzzle2048Tiles: z.array(z.object({ value: z.number(), row: z.number(), col: z.number() })).default([]),
     puzzle2048Score: z.number().default(0),
     puzzle2048BestScore: z.number().default(0),
     puzzle2048Size: z.number().default(4),
@@ -493,7 +571,14 @@ export function moveTiles2048(
       if (target) {
         if (target.value === tile.value && !target.justMerged) {
           sorted = sorted.filter(t => t !== target && t !== tile);
-          sorted.push({ value: tile.value * 2, id: tile.id, row: nextRow, col: nextCol, isNew: false, justMerged: true });
+          sorted.push({
+            value: tile.value * 2,
+            id: tile.id,
+            row: nextRow,
+            col: nextCol,
+            isNew: false,
+            justMerged: true,
+          });
           scored += tile.value * 2;
           changed = true;
         }
@@ -560,7 +645,7 @@ export const useVNStore = defineStore('vn', () => {
   const defaultUnlockedId = SYSTEM_PERSONALITIES[0]?.id ?? '';
   const systemChatHistories = ref<Record<string, SystemChatMessage[]>>(
     typeof _rawChatVars?.vn_system_chats === 'object' && _rawChatVars.vn_system_chats !== null
-      ? _rawChatVars.vn_system_chats as Record<string, SystemChatMessage[]>
+      ? (_rawChatVars.vn_system_chats as Record<string, SystemChatMessage[]>)
       : {},
   );
   const unlockedPersonalityIds = ref<Set<string>>(
@@ -570,8 +655,8 @@ export const useVNStore = defineStore('vn', () => {
   );
   const unreadPersonalityIds = ref<Set<string>>(new Set());
   const lastActiveUnlockedPersonalityId = ref<string | null>(
-    (typeof _rawChatVars?.vn_last_active_unlocked_personality_id === 'string' &&
-      _rawChatVars.vn_last_active_unlocked_personality_id)
+    typeof _rawChatVars?.vn_last_active_unlocked_personality_id === 'string' &&
+      _rawChatVars.vn_last_active_unlocked_personality_id
       ? _rawChatVars.vn_last_active_unlocked_personality_id
       : defaultUnlockedId || null,
   );
@@ -586,8 +671,49 @@ export const useVNStore = defineStore('vn', () => {
     );
   });
 
+  // 生图：同步到聊天变量供世界书条目启用（打开后自动启用对应世界书条目）
+  watchEffect(() => {
+    const on = settings.value.imageGenEnabled;
+    const bg = on && settings.value.backgroundGenEnabled;
+    const cg = on && settings.value.cgGenEnabled;
+    insertOrAssignVariables(
+      { vn_bg_gen_enabled: bg, vn_cg_gen_enabled: cg },
+      { type: 'chat' },
+    );
+  });
+
   const systemChatOpen = ref(false);
   const activePersonalityId = ref<string | null>(null);
+
+  // --- Summary System ---
+  const _rawSummaryData = getVariables({ type: 'chat' });
+  const summaryData = ref<{
+    small: SmallSummary[];
+    big: BigSummary[];
+    currentRound: number;
+  }>({
+    small: Array.isArray(_rawSummaryData?.vn_summary_small) ? _rawSummaryData.vn_summary_small : [],
+    big: Array.isArray(_rawSummaryData?.vn_summary_big) ? _rawSummaryData.vn_summary_big : [],
+    currentRound: typeof _rawSummaryData?.vn_summary_current_round === 'number' ? _rawSummaryData.vn_summary_current_round : 0,
+  });
+
+  // --- Second API Generations Tracking ---
+  const secondApiGenerations = ref<SecondApiGeneration[]>(
+    Array.isArray(_rawSummaryData?.vn_second_api_generations) ? _rawSummaryData.vn_second_api_generations : [],
+  );
+
+  // Persist summary data and second API generations
+  watchEffect(() => {
+    insertOrAssignVariables(
+      {
+        vn_summary_small: klona(summaryData.value.small),
+        vn_summary_big: klona(summaryData.value.big),
+        vn_summary_current_round: summaryData.value.currentRound,
+        vn_second_api_generations: klona(secondApiGenerations.value),
+      },
+      { type: 'chat' },
+    );
+  });
 
   // --- Derived ---
   const gold = computed(() => gameData.value.gold);
@@ -610,6 +736,52 @@ export const useVNStore = defineStore('vn', () => {
     settings.value.imageApiUrl && settings.value.imageApiKey ? 'available' : 'disabled',
   );
 
+  // --- 生图（事件通信）---
+  const stageBackgroundImage = ref<string | null>(null);
+  const stageCgImage = ref<string | null>(null);
+  const pendingImageRequests = new Map<string, { type: 'background' | 'cg' }>();
+  let imageGenListenerStopped: (() => void) | null = null;
+
+  function handleImageResponse(responseData: ImageGenResponseData) {
+    if (!responseData || !responseData.id) return;
+    const pending = pendingImageRequests.get(responseData.id);
+    if (!pending) return;
+    pendingImageRequests.delete(responseData.id);
+    if (responseData.success && responseData.imageData) {
+      if (pending.type === 'background') stageBackgroundImage.value = responseData.imageData;
+      else stageCgImage.value = responseData.imageData;
+    }
+  }
+
+  function setupImageGenListener() {
+    if (imageGenListenerStopped) return;
+    const ret = eventOn(ImageGenEventType.GENERATE_IMAGE_RESPONSE, handleImageResponse);
+    imageGenListenerStopped = ret.stop;
+  }
+
+  function requestImage(prompt: string, type: 'background' | 'cg') {
+    if (!settings.value.imageGenEnabled) return;
+    if (type === 'background' && !settings.value.backgroundGenEnabled) return;
+    if (type === 'cg' && !settings.value.cgGenEnabled) return;
+    const requestId = 'vn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    pendingImageRequests.set(requestId, { type });
+    const requestData: ImageGenRequestData = {
+      id: requestId,
+      prompt,
+      width: null,
+      height: null,
+    };
+    eventEmit(ImageGenEventType.GENERATE_IMAGE_REQUEST, requestData);
+  }
+
+  function requestBackgroundImage(prompt: string) {
+    requestImage(prompt, 'background');
+  }
+
+  function requestCgImage(prompt: string) {
+    requestImage(prompt, 'cg');
+  }
+
   // --- Module locking ---
   function getModuleLockReason(moduleId: string): string | undefined {
     if (moduleId === 'shop' && secondApiStatus.value === 'disabled') return '需要配置第二 API';
@@ -621,7 +793,7 @@ export const useVNStore = defineStore('vn', () => {
 
   // --- Second API unified entry ---
   async function callSecondApi(
-    task: 'danmaku' | 'shop' | 'system' | 'riddle',
+    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'summary' | 'imageTag',
     payload: SecondApiPayload,
   ): Promise<string[] | ShopItem[] | string> {
     const url = settings.value.secondApiUrl?.trim();
@@ -651,7 +823,9 @@ export const useVNStore = defineStore('vn', () => {
           ]
         : task === 'shop'
           ? [{ role: 'user', content: (payload as ShopPayload).systemPrompt }]
-          : (payload as SystemPayload | RiddlePayload).ordered_prompts;
+          : task === 'summary' || task === 'imageTag'
+            ? [{ role: 'user', content: (payload as SummaryPayload | ImageTagPayload).systemPrompt }]
+            : (payload as SystemPayload | RiddlePayload).ordered_prompts;
 
     const doRequest = (): Promise<string> =>
       Promise.race([
@@ -679,7 +853,10 @@ export const useVNStore = defineStore('vn', () => {
         if (task === 'shop') {
           const items: ShopItem[] = [];
           const lineRegex = /^(.+?)\s*[|｜]\s*(.+?)\s*[|｜]\s*(\d+)\s*$/;
-          for (const line of raw.split(/\n/).map(s => s.trim()).filter(Boolean)) {
+          for (const line of raw
+            .split(/\n/)
+            .map(s => s.trim())
+            .filter(Boolean)) {
             const m = line.match(lineRegex);
             if (m) items.push({ id: `s${Date.now()}_${items.length}`, name: m[1], effect: m[2], price: Number(m[3]) });
           }
@@ -754,6 +931,295 @@ export const useVNStore = defineStore('vn', () => {
       /* toast already in callSecondApi */
     }
   }
+
+  // ====== Summary System ======
+
+  /** Unified API task executor - routes to main or second API based on config */
+  async function callApiForTask(
+    task: 'danmaku' | 'summary' | 'imageTag' | 'variable',
+    prompt: string,
+  ): Promise<string> {
+    let apiType: 'main' | 'second' | 'disabled' = 'disabled';
+    
+    if (task === 'danmaku') apiType = settings.value.apiTaskDanmaku;
+    else if (task === 'summary') apiType = settings.value.apiTaskSummary;
+    else if (task === 'imageTag') apiType = settings.value.apiTaskImageTag;
+    else if (task === 'variable') apiType = settings.value.apiTaskVariable;
+    
+    if (apiType === 'disabled') return '';
+    
+    if (apiType === 'second') {
+      return await callSecondApiWithTracking(task, { systemPrompt: prompt });
+    } else {
+      // Use main API - note: generate() is not available in store context
+      // For now, we'll just use second API or return empty
+      console.warn('[Summary] Main API not implemented for task:', task);
+      return '';
+    }
+  }
+
+  /** Wrapper for callSecondApi that tracks generations and inserts to message */
+  async function callSecondApiWithTracking(
+    task: 'danmaku' | 'summary' | 'imageTag' | 'variable',
+    payload: { systemPrompt: string },
+  ): Promise<string> {
+    const result = await callSecondApi(task, payload);
+    const content = typeof result === 'string' ? result : JSON.stringify(result);
+    
+    // Record generation
+    const generation: SecondApiGeneration = {
+      id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      type: task,
+      content,
+      timestamp: Date.now(),
+      messageId: -1,
+      inserted: false,
+    };
+    
+    secondApiGenerations.value.push(generation);
+    
+    // Keep only last 50 generations
+    if (secondApiGenerations.value.length > 50) {
+      secondApiGenerations.value = secondApiGenerations.value.slice(-50);
+    }
+    
+    // Insert to latest message
+    await insertGenerationToMessage(generation);
+    
+    // Toast notification
+    showToast(`第二API已生成${task}内容`);
+    
+    return content;
+  }
+
+  /** Insert second API generation to message end as HTML comment */
+  async function insertGenerationToMessage(gen: SecondApiGeneration) {
+    const messages = getChatMessages('latest');
+    const lastMessage = messages[messages.length - 1];
+    
+    if (!lastMessage) return;
+    
+    const marker = `\n<!-- 第二API生成(${gen.type}): ${gen.content} -->`;
+    const updatedMessage = lastMessage.message + marker;
+    
+    await setChatMessages([{ ...lastMessage, message: updatedMessage }], lastMessage.id);
+    
+    gen.messageId = lastMessage.id;
+    gen.inserted = true;
+  }
+
+  /** Generate small summary from recent messages */
+  async function generateSmallSummary() {
+    const interval = settings.value.summarySmallInterval;
+    const startRound = summaryData.value.currentRound - interval + 1;
+    const endRound = summaryData.value.currentRound;
+    
+    // Get recent N messages
+    const recentMessages = getChatMessages(`-${interval}-latest`);
+    const content = recentMessages.map(m => m.message).join('\n\n');
+    
+    const prompt = `请简要总结以下${interval}轮对话的关键信息（200字以内）：\n\n${content}`;
+    
+    try {
+      const summary = await callApiForTask('summary', prompt);
+      
+      if (!summary) return;
+      
+      summaryData.value.small.push({
+        id: `small-${Date.now()}`,
+        content: summary,
+        rounds: `${startRound}-${endRound}`,
+        timestamp: Date.now(),
+      });
+      
+      showToast(`已生成第 ${summaryData.value.small.length} 个小总结`);
+    } catch (e) {
+      console.error('[Summary] Failed to generate small summary:', e);
+      showToast('小总结生成失败');
+    }
+  }
+
+  /** Generate big summary from accumulated small summaries */
+  async function generateBigSummary() {
+    const smallSummaries = summaryData.value.small;
+    
+    if (smallSummaries.length === 0) return;
+    
+    const firstRound = parseInt(smallSummaries[0].rounds.split('-')[0]);
+    const lastRound = summaryData.value.currentRound;
+    
+    const content = smallSummaries.map((s, i) => `[${i + 1}] ${s.content}`).join('\n\n');
+    
+    const prompt = `请将以下${smallSummaries.length}个小总结提炼为一个关键的长期记忆（300字以内）：\n\n${content}`;
+    
+    try {
+      const bigSummary = await callApiForTask('summary', prompt);
+      
+      if (!bigSummary) return;
+      
+      summaryData.value.big.push({
+        id: `big-${Date.now()}`,
+        content: bigSummary,
+        rounds: `${firstRound}-${lastRound}`,
+        timestamp: Date.now(),
+        smallCount: smallSummaries.length,
+      });
+      
+      // Clear small summaries
+      summaryData.value.small = [];
+      
+      // Keep only last 10 big summaries
+      if (summaryData.value.big.length > 10) {
+        summaryData.value.big = summaryData.value.big.slice(-10);
+      }
+      
+      showToast(`已生成大总结（包含 ${smallSummaries.length} 个小总结）`);
+    } catch (e) {
+      console.error('[Summary] Failed to generate big summary:', e);
+      showToast('大总结生成失败');
+    }
+  }
+
+  /** Called from index.ts on GENERATION_ENDED; checks and triggers summaries */
+  async function onMessageGenerated(message_id: number) {
+    if (!settings.value.summaryAutoEnabled) return;
+    
+    summaryData.value.currentRound++;
+    
+    console.info(`[Summary] Round ${summaryData.value.currentRound}, message ${message_id}`);
+    
+    // Check if need small summary
+    if (summaryData.value.currentRound % settings.value.summarySmallInterval === 0) {
+      console.info(`[Summary] Triggering small summary at round ${summaryData.value.currentRound}`);
+      await generateSmallSummary();
+    }
+    
+    // Check if need big summary
+    if (summaryData.value.small.length >= settings.value.summaryBigThreshold) {
+      console.info(`[Summary] Triggering big summary (${summaryData.value.small.length} small summaries)`);
+      await generateBigSummary();
+    }
+  }
+
+  /** Manually trigger big summary */
+  async function manualTriggerBigSummary() {
+    if (summaryData.value.small.length === 0) {
+      showToast('没有小总结可以生成大总结');
+      return;
+    }
+    
+    await generateBigSummary();
+  }
+
+  /** Edit summary content */
+  function editSummary(type: 'small' | 'big', id: string, newContent: string) {
+    const list = type === 'small' ? summaryData.value.small : summaryData.value.big;
+    const summary = list.find(s => s.id === id);
+    if (summary) {
+      summary.content = newContent;
+      showToast('总结已更新');
+    }
+  }
+
+  /** Delete summary */
+  function deleteSummary(type: 'small' | 'big', id: string) {
+    if (type === 'small') {
+      summaryData.value.small = summaryData.value.small.filter(s => s.id !== id);
+    } else {
+      summaryData.value.big = summaryData.value.big.filter(s => s.id !== id);
+    }
+    showToast('总结已删除');
+  }
+
+  // ====== Worldbook Management ======
+
+  /** Get enhanced worldbook with our custom fields */
+  function getEnhancedWorldbook(): WorldbookEntryEnhanced[] {
+    const wb = getWorldbook();
+    if (!wb || !wb.entries) return [];
+    
+    return wb.entries.map(entry => ({
+      ...entry,
+      enabled: entry.enabled ?? true,
+      targetApi: entry.targetApi ?? 'main',
+      autoControl: entry.autoControl ?? false,
+      linkedFeature: entry.linkedFeature,
+    }));
+  }
+
+  /** Update worldbook entry enhancement fields */
+  function updateWorldbookEntry(uid: number, updates: Partial<WorldbookEntryEnhanced>) {
+    const wb = getWorldbook();
+    if (!wb || !wb.entries) return;
+    
+    const entry = wb.entries.find(e => e.uid === uid);
+    if (entry) {
+      Object.assign(entry, updates);
+      replaceWorldbook(wb);
+      showToast('世界书条目已更新');
+    }
+  }
+
+  /** Auto-control worldbook entries based on feature toggles */
+  function updateWorldbookAutoControl() {
+    const wb = getWorldbook();
+    if (!wb || !wb.entries) return;
+    
+    let updated = false;
+    
+    wb.entries.forEach(entry => {
+      if (!entry.autoControl) return;
+      
+      let shouldEnable = false;
+      
+      switch (entry.linkedFeature) {
+        case 'danmaku':
+          shouldEnable = settings.value.danmakuEnabled;
+          break;
+        case 'imageGen':
+          shouldEnable = settings.value.imageGenEnabled;
+          break;
+        case 'summary':
+          shouldEnable = settings.value.summaryAutoEnabled;
+          break;
+      }
+      
+      if (entry.enabled !== shouldEnable) {
+        entry.enabled = shouldEnable;
+        updated = true;
+      }
+    });
+    
+    if (updated) {
+      replaceWorldbook(wb);
+      console.info('[Worldbook] Auto-control updated entries based on feature toggles');
+    }
+  }
+
+  /** Filter worldbook entries for API request based on targetApi */
+  function filterWorldbookForApi(apiType: 'main' | 'second'): typeof getWorldbook extends () => infer R ? R : never {
+    const wb = getWorldbook();
+    if (!wb || !wb.entries) return wb;
+    
+    const filtered = {
+      ...wb,
+      entries: wb.entries.filter(entry => {
+        if (!entry.enabled) return false;
+        const target = entry.targetApi ?? 'main';
+        return target === apiType || target === 'both';
+      }),
+    };
+    
+    return filtered;
+  }
+
+  // Watch feature toggles and update worldbook auto-control
+  watch(
+    () => [settings.value.danmakuEnabled, settings.value.imageGenEnabled, settings.value.summaryAutoEnabled],
+    () => {
+      updateWorldbookAutoControl();
+    },
+  );
 
   // --- Characters / modules ---
   const userCharacter = ref<UserCharacter>({ name: '旅人', avatarUrl: '', showSprite: false });
@@ -1048,7 +1514,7 @@ export const useVNStore = defineStore('vn', () => {
   function normalizeForAnswer(s: string): string {
     return s
       .trim()
-      .replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
       .replace(/\s+/g, '')
       .toLowerCase();
   }
@@ -1075,7 +1541,7 @@ export const useVNStore = defineStore('vn', () => {
     return true;
   }
 
-  function onRiddleSolved(rounds: number, elapsedMs: number) {
+  function onRiddleSolved(rounds: number, _elapsedMs: number) {
     const reward = 50 + rounds * 20;
     changeGold(reward, 'ai_riddle', `猜谜成功 (${rounds} 轮)`);
     gameData.value.riddleLastRecord = {
@@ -1115,7 +1581,7 @@ export const useVNStore = defineStore('vn', () => {
     const hist = riddleChatHistory.value;
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
       { role: 'system', content: RIDDLE_SYSTEM_PROMPT },
-      ...hist.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text })),
+      ...hist.map(m => ({ role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant', content: m.text })),
     ];
     const raw = (await callSecondApi('riddle', { ordered_prompts })) as string;
     const reply = raw?.trim() || '让我再想想…';
@@ -1326,7 +1792,13 @@ export const useVNStore = defineStore('vn', () => {
     clearSecondApiDegraded,
     callSecondApi,
     triggerDanmakuForMessage,
+    onMessageGenerated,
     imageApiStatus,
+    stageBackgroundImage,
+    stageCgImage,
+    setupImageGenListener,
+    requestBackgroundImage,
+    requestCgImage,
     getModuleLockReason,
     userCharacter,
     characterRoster,
@@ -1384,6 +1856,45 @@ export const useVNStore = defineStore('vn', () => {
     shopItems,
     shopRefreshing,
     refreshShop,
+    purchaseShopItem,
+    danmakuItems,
+    pushDanmaku,
+    removeDanmaku,
+    SYSTEM_PERSONALITIES,
+    systemChatOpen,
+    activePersonalityId,
+    systemChatHistories,
+    unlockedPersonalityIds,
+    unreadPersonalityIds,
+    lastActiveUnlockedPersonalityId,
+    selectSystemPersonality,
+    sendSystemUserMessage,
+    addProactiveToSystemChat,
+    triggerProactive,
+    setOverlay,
+    toggleLeftMenu,
+    toggleRightMenu,
+    selectChoice,
+    lockChoice,
+    clearChoices,
+    updateSettings,
+    updateUserCharacter,
+    showToast,
+    // Summary system
+    summaryData,
+    generateSmallSummary,
+    generateBigSummary,
+    manualTriggerBigSummary,
+    editSummary,
+    deleteSummary,
+    // Second API generations
+    secondApiGenerations,
+    // Worldbook management
+    getEnhancedWorldbook,
+    updateWorldbookEntry,
+    updateWorldbookAutoControl,
+    filterWorldbookForApi,
+  };
     purchaseShopItem,
     danmakuItems,
     pushDanmaku,

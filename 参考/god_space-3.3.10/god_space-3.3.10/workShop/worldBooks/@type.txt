@@ -1,0 +1,61 @@
+window.GameAPI = {
+    // 定义一个属性 'settings'
+    get assaData() {
+        // GameAPI.assaData 
+        return assaSettingsData;
+    },
+         getThemeVar: function(varName) {
+//    --modal-content-bg: none; /* 默认透明 */
+//             --primary-color: #00faff;
+//             --secondary-color: #7affff;
+//    --base-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; /* 默认字体 */
+//             --container-bg-color: rgba(10, 25, 47, 0.75);
+//             --border-color: rgba(0, 250, 255, 0.3);
+//             --glow-color: rgba(0, 250, 255, 0.5);
+//             --text-color: #e6f1ff;
+//             --text-secondary-color: #a8c0e1;
+//             --background-color: rgba(10, 25, 47);
+//             --danger-color: #ff4d4d;
+//             --danger-glow-color: rgba(255, 77, 77, 0.5);
+//              --success-color: #4dff88;
+//             --success-glow-color: rgba(77, 255, 136, 0.5);
+        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    },
+    get statData() {
+ 
+        return currentGameData;
+    },
+      get playCharacterData() {
+ 
+        return playCharacterData;
+    },
+      get checkMemoryData() {
+ 
+        return checkMemoryData;
+    },
+      get worldAttitudeData() {
+ 
+        return worldAttitudeData;
+    },
+    get characterStatusData() {
+ 
+        return characterStatusData;
+    },
+    get conversationHistory() {
+ 
+        return conversationHistory;
+    },
+ triggerassa: function(...args) {
+        // ✅ 调用时才执行，此时函数应该已经定义了
+        if (typeof triggerassa === 'function') {
+            return triggerassa(...args);
+        } else {
+            console.error("triggerassa 函数未定义");
+        }
+    },
+ 
+    updateSettings: function(newData) {
+        assaSettingsData = newData; // 直接修改原本的 let 变量
+        console.log("数据已通过 API 更新！");
+    }
+}

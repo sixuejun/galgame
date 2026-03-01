@@ -5,6 +5,7 @@
       type="range"
       :min="min"
       :max="max"
+      :step="step"
       :value="value"
       class="flex-1 slider-vn"
       @input="onInput"
@@ -21,8 +22,9 @@ const props = withDefaults(defineProps<{
   value: number;
   min?: number;
   max?: number;
+  step?: number;
   suffix?: string;
-}>(), { min: 0, max: 100, suffix: '' });
+}>(), { min: 0, max: 100, step: 1, suffix: '' });
 
 const emit = defineEmits<{ update: [value: number] }>();
 

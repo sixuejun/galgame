@@ -1,0 +1,4 @@
+PrimarySceneType:[拱门建筑室内,现代建筑群,废土,现代城市街道,古代西方城镇,古代中国城市,西方市场,校园,森林,海洋,河流,草原,雪原,水下,简约房间,豪华房间,中式客栈,现代大堂,走廊,实验室,洞穴,监狱,星舰内部,浮空岛,辐射废土,赛博朋克,外太空,火山地带,沙漠绿洲,竹林,瀑布,峡谷,古代遗迹,蒸汽朋克工厂,魔法图书馆,水晶洞穴,樱花林,古代竞技场,冰川,沼泽,天空之城,地下城,禅意庭院,科幻实验室,废弃游乐园,热带雨林,月球表面],
+TimeAndLight: [BrightDay,OvercastDay,GoldenHour,DeepNight],
+AtmosphereAndCondition: [Peaceful,Decay,Dynamic]
+ 

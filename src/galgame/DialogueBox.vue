@@ -17,7 +17,7 @@
           <!-- User avatar (conditional) -->
           <div
             v-if="layoutMode === 'withAvatar'"
-            class="flex-shrink-0 w-20 md:w-24 p-3 flex items-start justify-center column-rule"
+            class="shrink-0 w-20 md:w-24 p-3 flex items-start justify-center column-rule"
           >
             <div class="w-14 h-14 md:w-18 md:h-18 border overflow-hidden" :style="{ borderColor:'rgba(90,79,64,0.4)', background:'rgba(74,64,53,0.3)' }">
               <img
@@ -31,9 +31,8 @@
 
           <!-- Prev arrow -->
           <button
-            class="flex-shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
+            class="dialogue-nav-arrow shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
             :class="isFirstLine ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
-            :style="{ ':hover': { background:'rgba(212,197,160,0.05)' } }"
             :disabled="isFirstLine"
             @click.stop="!isFirstLine && prevLine()"
           >
@@ -77,7 +76,7 @@
 
           <!-- Next arrow -->
           <button
-            class="flex-shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
+            class="dialogue-nav-arrow shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
             :class="isLastLine || hasChoices ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
             :disabled="isLastLine || hasChoices"
             @click.stop="!isLastLine && !hasChoices && nextLine()"
@@ -215,3 +214,9 @@ onUnmounted(() => {
   if (typingTimer) clearTimeout(typingTimer);
 });
 </script>
+
+<style scoped>
+.dialogue-nav-arrow:hover:not(:disabled) {
+  background: rgba(212, 197, 160, 0.05);
+}
+</style>

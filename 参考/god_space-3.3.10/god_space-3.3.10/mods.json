@@ -1,0 +1,63 @@
+[
+  {
+    "id": "mod_test_01",
+    "name": "公告位",
+    "author": "assa",
+    "version": "1.0",
+    "tags": ["UI", "world"],
+    "description": "真的会有想投稿的吗？如果有想要投稿的自定义mod（世界书或脚本），请找assa。文件是简陋的接口文档",
+    "scriptUrl": "",
+    "worldBookUrl": "https://longlivecanc.github.io/god_space/workShop/worldBooks/@type.txt",
+  "previewImage": ""
+  }, {
+    "id": "小蝌蚪找妈妈-mod-超复杂npc",
+    "name": "npc美化UI/超复杂npc世界书",
+    "author": "assa",
+    "version": "1.0",
+    "tags": ["UI","world"],
+    "description": "开启该脚本后，左上角会单独有npc小球，美化字段基于原版，兼容原版和超复杂npc。",
+    "scriptUrl": "https://longlivecanc.github.io/god_space/workShop/scripts/npccard01.js",
+    "worldBookUrl": "https://longlivecanc.github.io/god_space/workShop/worldBooks/小蝌蚪找妈妈-mod-超复杂npc.json",
+    "previewImage": ""
+  } , {
+    "id": "小蝌蚪找妈妈-自定义词条世界书",
+    "name": "自定义词条世界书",
+    "author": "assa",
+    "version": "1.0",
+    "tags": ["world"],
+    "description": "[自定义词条世界书]下载的快捷链接。将其挂载到全局后，对你想要自定义的条目进行编辑。不需要关闭原条目",
+    "scriptUrl": "",
+    "worldBookUrl": "https://longlivecanc.github.io/god_space/workShop/worldBooks/自定义词条世界书.json",
+    "previewImage": ""
+  } , {
+    "id": "小蝌蚪找妈妈-mod-合理性审查之骰",
+    "name": "合理性审查之骰",
+    "author": "assa",
+    "version": "1.0",
+    "tags": ["world"],
+    "description": "骰子会对用户输入进行合理性审查。不需要关闭原条目",
+    "scriptUrl": "",
+    "worldBookUrl": "https://longlivecanc.github.io/god_space/workShop/worldBooks/小蝌蚪找妈妈-mod-合理性审查之骰.json",
+    "previewImage": ""
+  } , {
+    "id": "领养小孩-外挂版世界书",
+    "name": "dlc:领养小孩",
+    "author": "assa",
+    "version": "1.0",
+    "tags": ["world"],
+    "description": "带简单分阶段的领养小孩模拟器mod，需外挂并开无世界观。小孩有专属的属性字段，因此比较推荐就用原版的简单npc档案。建议关骰子。专属该dlc的美化正在施工中...",
+    "scriptUrl": "",
+    "worldBookUrl": "https://longlivecanc.github.io/god_space/workShop/worldBooks/领养小孩-外挂版世界书.json",
+    "previewImage": ""
+  } , {
+    "id": "小蝌蚪找妈妈-mod-信息面板",
+    "name": "在正文生成美化的物品面板",
+    "author": "LushFlower",
+    "version": "1.0",
+    "tags": ["world"],
+    "description": "拓展了原本的物品格式，且会在正文生成物品、个人面板等被美化过的信息面板。",
+    "scriptUrl": "",
+    "worldBookUrl": "https://longlivecanc.github.io/god_space/workShop/worldBooks/信息面板.json",
+    "previewImage": ""
+  } 
+]

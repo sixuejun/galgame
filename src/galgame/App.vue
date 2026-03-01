@@ -8,7 +8,7 @@
 
     <div class="pointer-events-none absolute inset-0 flex flex-col" style="z-index: 20">
       <div class="pointer-events-auto">
-        <QuickAccessMenu @fullscreen="handleFullscreen" />
+        <QuickAccessMenu :is-fullscreen="isFullscreen" @toggle-fullscreen="toggleFullscreen" />
       </div>
       <div class="flex-1" />
       <div class="pointer-events-auto pb-6 md:pb-8">
@@ -65,6 +65,18 @@ const context = injectStreamingMessageContext();
 const store = useVNStore();
 const mainEl = ref<HTMLElement | null>(null);
 
+function getFullscreenDoc(): Document | null {
+  if (document.fullscreenElement) return document;
+  try {
+    if (window.parent !== window && window.parent.document?.fullscreenElement) return window.parent.document;
+  } catch {
+    /* 跨域时 parent 不可访问 */
+  }
+  return null;
+}
+
+const isFullscreen = ref(!!getFullscreenDoc());
+
 const dialogueLines = computed(() => parseDialogueLines(context.message));
 const choices = computed(() => parseChoices(context.message));
 
@@ -87,21 +99,40 @@ watch(
   },
 );
 
-function handleFullscreen() {
+function handleFullscreenChange() {
+  isFullscreen.value = !!getFullscreenDoc();
+}
+
+async function toggleFullscreen() {
   try {
-    const iframe = window.frameElement as HTMLElement | null;
-    if (iframe && !window.parent.document.fullscreenElement) {
-      iframe.requestFullscreen();
-    } else if (iframe && window.parent.document.fullscreenElement) {
-      window.parent.document.exitFullscreen();
-    } else if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen();
+    if (isFullscreen.value) {
+      // 退出全屏：先试当前 document，再试父 document（iframe 内全屏可能在父页面上）
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        try {
+          if (window.parent !== window && window.parent.document?.fullscreenElement) {
+            await window.parent.document.exitFullscreen();
+          }
+        } catch {
+          /* 跨域时 parent 不可访问 */
+        }
+      }
+      isFullscreen.value = false;
+      return;
     }
-  } catch {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-    else document.exitFullscreen();
+    const fsDoc = getFullscreenDoc();
+    if (fsDoc) {
+      await fsDoc.exitFullscreen();
+      isFullscreen.value = false;
+      return;
+    }
+    if (mainEl.value) {
+      await mainEl.value.requestFullscreen();
+      isFullscreen.value = true;
+    }
+  } catch (e) {
+    console.warn('全屏切换失败:', e);
   }
 }
 
@@ -122,12 +153,43 @@ watch(
 );
 
 onMounted(() => {
-  (window as unknown as { __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState =
-    (window as unknown as { __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState ?? {
-      activeGenerationMesId: null,
-      mainStore: null,
-    };
-  ((window as unknown as { __galgameState: { mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState as { mainStore: ReturnType<typeof useVNStore> | null }).mainStore = store;
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  try {
+    if (window.parent !== window && window.parent.document) {
+      window.parent.document.addEventListener('fullscreenchange', handleFullscreenChange);
+    }
+  } catch {
+    /* 跨域时忽略 */
+  }
+  (
+    window as unknown as {
+      __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null };
+    }
+  ).__galgameState = (
+    window as unknown as {
+      __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null };
+    }
+  ).__galgameState ?? {
+    activeGenerationMesId: null,
+    mainStore: null,
+  };
+  (
+    (window as unknown as { __galgameState: { mainStore: ReturnType<typeof useVNStore> | null } }).__galgameState as {
+      mainStore: ReturnType<typeof useVNStore> | null;
+    }
+  ).mainStore = store;
+  store.setupImageGenListener();
   console.info(`[galgame] Mounted streaming VN interface for floor ${context.message_id}`);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  try {
+    if (window.parent !== window && window.parent.document) {
+      window.parent.document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }
+  } catch {
+    /* 跨域时忽略 */
+  }
 });
 </script>

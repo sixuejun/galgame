@@ -1,0 +1,1421 @@
+ 
+
+ 
+    <div id="initialization-container" style="display: none;">
+      
+    <button id="back-button" class="action-button">< 返回</button>
+    <audio id="click-sound" src="https://files.catbox.moe/31vqt3.mp3" preload="auto"></audio>
+    <audio id="add-point-sound" src="https://files.catbox.moe/k3i5ws.mp3" preload="auto"></audio>
+    <audio id="remove-point-sound" src="https://files.catbox.moe/a2er5m.mp3" preload="auto"></audio>
+
+
+
+    <div id="page-0" class="page active">
+        <div class="header">
+            <h1>世界模式校准</h1>
+            <div class="subtitle">// 选择你的故事起点</div>
+            <button class="action-button" id="restore-btn">之前的聊天记录突然消失了？点击恢复</button>
+        </div>
+
+        <div class="form-section">
+            <h2>世界观模式</h2>
+            <div class="mode-selection-container">
+                                <div class="mode-option">
+                    <input type="radio" id="mode-godspace" name="world-mode" value="1" checked>
+                    <label for="mode-godspace">本卡原生主神</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="mode-reincarnation" name="world-mode" value="22" >
+                    <label for="mode-reincarnation">轮回乐园</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="mode-infinite" name="world-mode" value="5">
+                    <label for="mode-infinite">无限恐怖</label>
+                </div>
+ <div class="mode-option">
+                    <input type="radio" id="mode-love" name="world-mode" value="34">
+                    <label for="mode-love">快穿攻略</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>造物态度</h2>
+            <div class="mode-selection-container">
+                 <div class="mode-option">
+                    <input type="radio" id="creator-neutral" name="creator-attitude" value="19" checked>
+                    <label for="creator-neutral">造物中立</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="creator-malicious" name="creator-attitude" value="4">
+                    <label for="creator-malicious">造物恶意</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="creator-reverent" name="creator-attitude" value="3">
+                    <label for="creator-reverent">造物崇敬</label>
+                </div>
+                                <div class="mode-option">
+                    <input type="radio" id="creator-none" name="creator-attitude" value="38">
+                    <label for="creator-none">无造物</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>选项区模式</h2>
+            <div class="mode-selection-container">
+                <div class="mode-option">
+                    <input type="radio" id="options-on" name="options-mode" value="10" checked>
+                    <label for="options-on">开启</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="options-off" name="options-mode" value="29">
+                    <label for="options-off">关闭</label>
+                </div>
+            </div>
+        </div>
+        
+          <div class="form-section">
+            <h2>自动大小总结(如果不使用自带的大小总结，得将隐藏最新数设置的足够高)</h2>
+            <div class="mode-selection-container">
+                <div class="mode-option">
+                    <input type="radio" id="summary-on" name="summary-mode" value="on" checked>
+                    <label for="summary-on">开启</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="summary-off" name="summary-mode" value="off" >
+                    <label for="summary-off">关闭</label>
+                </div>
+            </div>
+        </div>
+ <div class="form-section">
+            <h2>真实世界MOD</h2>
+            <div class="mode-selection-container">
+                <div class="mode-option">
+                    <input type="radio" id="real-world-on" name="real-world-mode" value="on">
+                    <label for="real-world-on">开启</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="real-world-off" name="real-world-mode" value="off" checked>
+                    <label for="real-world-off">关闭</label>
+                </div>
+            </div>
+        </div>
+
+         <div class="form-section">
+            <h2>困难MOD</h2>
+            <div class="mode-selection-container">
+                <div class="mode-option">
+                    <input type="radio" id="hard-on" name="hard-mode" value="on">
+                    <label for="hard-on">开启</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="hard-off" name="hard-mode" value="off" checked>
+                    <label for="hard-off">关闭</label>
+                </div>
+            </div>
+        </div>
+
+
+        
+         <div class="form-section">
+            <h2>地图模块</h2>
+            <div class="mode-selection-container">
+                <div class="mode-option">
+                    <input type="radio" id="simple-on" name="simple-mode" value="on" checked>
+                    <label for="simple-on">开启</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" id="simple-off" name="simple-mode" value="off">
+                    <label for="simple-off">关闭</label>
+                </div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button id="start-setup-button" class="action-button">[ <确定并开始构建> ]</button>
+        </div>
+    </div>
+
+
+
+    <div id="page-1" class="page"> 
+        <div class="header">
+            <h1>主神空间接入</h1>
+            <div class="subtitle">// 参数初始化校准</div>
+             <button id="settings-btn-init" title="设置">
+    ⚙
+</button>
+    
+        </div>
+        <!-- (内容和第一页完全一样，只在最后加一个按钮) -->
+  <div class="form-section">
+            <h2 class="collapsible-header">任务细节设定</h2>
+            <div class="collapsible-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="task-tone-select">选择任务基调</label>
+                        <select id="task-tone-select" class="custom-select"></select>
+                    </div>
+                     <div class="form-group" id="custom-task-tone-group" style="display: none;">
+                        <label for="custom-task-tone">自定义任务基调</label>
+                        <input type="text" id="custom-task-tone" class="custom-select" placeholder="输入你想要的基调">
+                    </div>
+                </div>
+                <div class="form-grid" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label for="world-type-select">选择世界类型</label>
+                        <select id="world-type-select" class="custom-select"></select>
+                    </div>
+                    <div class="form-group" id="custom-world-type-group" style="display: none;">
+                        <label for="custom-world-type">自定义世界类型</label>
+                        <input type="text" id="custom-world-type" class="custom-select" placeholder="输入你想要的世界类型">
+                    </div>
+                </div>
+                 <div class="form-grid" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label for="world-identity-select">选择当前世界身份</label>
+                        <select id="world-identity-select" class="custom-select"></select>
+                    </div>
+                    <div class="form-group" id="custom-world-identity-group" style="display: none;">
+                        <label for="world-identity">自定义当前世界身份</label>
+                        <input type="text" id="custom-world-identity" class="custom-select" placeholder="输入你想要的身份">
+                    </div>
+                </div>
+                 <div class="form-grid" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label for="opening-scenario-select">选择开局</label>
+                        <select id="opening-scenario-select" class="custom-select"></select>
+                    </div>
+                    <div class="form-group" id="custom-opening-scenario-group" style="display: none;">
+                        <label for="custom-opening-scenario">自定义开局</label>
+                        <input type="text" id="custom-opening-scenario" class="custom-select" placeholder="输入你想要的开局">
+                    </div>
+                </div>
+            </div>
+        </div>
+<div class="form-section">
+    <h2>选择初始身份</h2>
+    <div class="form-grid" style="grid-template-columns: 1fr 1fr; align-items: center;">
+        <div class="form-group"><label for="user-identity">身份（决定初始声望和初始积分）</label><select id="user-identity" class="custom-select"></select></div>
+        <div class="form-group"><p id="identity-description" style="color: var(--text-secondary-color); font-size: 0.9em; margin-top: 1.5rem; padding-left: 1rem;"></p></div>
+    </div>
+    <div id="paradise-camp-section" style="display: none; margin-top: 1rem;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; align-items: center;">
+            <div class="form-group">
+                <label for="paradise-camp">乐园阵营</label>
+                <select id="paradise-camp" class="custom-select">
+                    <option value="轮回乐园">轮回乐园</option>
+                    <option value="天启乐园">天启乐园</option>
+                    <option value="死亡乐园">死亡乐园</option>
+                    <option value="圣光乐园">圣光乐园</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="paradise-identity">乐园身份</label>
+                <select id="paradise-identity" class="custom-select">
+                    <option value="新人">新人</option>
+                    <option value="猎杀者">猎杀者</option>
+                    <option value="裁决者">裁决者</option>
+                    <option value="先驱者">先驱者</option>
+                    <option value="职工者">职工者</option>
+                    <option value="违规者">违规者</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="form-section">
+    <h2>选择天赋</h2>
+    <div class="form-grid" style="grid-template-columns: 1fr;">
+        <div class="form-group">
+            <label for="talent-select">预设天赋</label>
+            <select id="talent-select" class="custom-select">
+                   
+                <option value="随机">随机 - 命运的骰子已经掷出</option>
+                 <option value="无">无</option>
+                 <option value="你隐约知道自己是某个故事的角色，偶尔能听到“画外音”，但其他人只会觉得你在自言自语。">第四面墙知情者</option>
+    <option value="你的舌头是个超高精度的化学分析仪，能尝出任何物质的精确成分，包括毒药、泥土和别人的谎言。">绝对味觉</option>
+    <option value="强烈的情绪会以无害但奇特的物理形态出现在你周围。比如，极度悲伤时会下起小小的爆米花雨，愤怒时头顶会长出柔软的蘑菇。">情绪实体化</option>
+    <option value="你的行为会自动匹配背景音乐，只有你自己能听到。潜行时是爵士乐，战斗时是交响金属，摸鱼时则是悠扬的夏威夷小调。">BGM播放器</option>
+    <option value="你的运气总是以一种离奇的方式保护你。比如，你会被香蕉皮滑倒，却刚好躲过一颗狙击子弹，或者买彩票只中了一包纸巾，但那包纸巾刚好是最后一包。">反向幸运</option>
+    <option value="所有非人类的生物见到你都会立刻陷入恐慌，并想尽一切办法远离你。鸽子会为你绕路，警犬会放弃追捕，就连阿米巴原虫也会努力变形远离你的细胞。">动物社交恐怖分子</option>
+    <option value="你可以和任何非生命物体进行友好的精神交流，比如你的剑、你的鞋子、路边的石头。它们偶尔会给你一些奇怪但有用的建议。">万物皆为友</option>
+    <option value="你对所有在当前世界观下毫无用处的知识（比如地球上的互联网meme、冷门动画的剧情、量子力学的八卦）都了如指掌。">无用之学大师</option>
+    <option value="每天一次，你可以指定一个事件，并将其成功的概率强行提升或降低1%。虽然微小，但有时足以创造奇迹，或者带来灾难。">概率篡改（1%）</option>
+    <option value="你对所有常见的剧情杀、预言、诅咒都天然免疫。预言中的“天选之子”会突然对你失去兴趣，必死的诅咒在你身上会变成一个无伤大雅的debuff，比如“接下来24小时说话会押韵”。">剧情免疫</option>
+
+
+    <option value="你能够品尝出任何水（包括圣水和毒液）的精确水源地和过滤历史，但这并不能让你免疫。">水源地品鉴师</option>
+    <option value="你的影子拥有独立的、非常丰富的肢体语言，它会根据你的潜意识做出反应，比如在你撒谎时拼命摇头。">活泼的影子</option>
+<option value="当附近存在人物时，其人物的心理活动会以弹幕形式被你一个人看见。此为被动天赋无法关闭，时时刻刻都在向你直播附近人物的内心活动。">读心术</option>
+    <option value="你流下的眼泪是滚烫的，可以用来泡茶，但味道总是有点咸。">便携式热水壶</option>
+    <option value="你能够听到植物因缺水或光照不足而发出的微弱悲鸣，但无法与它们交流。">植物的悲鸣</option>
+    <option value="你打哈欠时，周围半径三米内所有能反光（比如金属、玻璃）的物体表面会短暂变得模糊不清。">防窥之哈欠</option>
+    <option value="在你完全静止不动超过一分钟后，你的身体会开始散发出刚出炉的面包的香气。">人体面包机</option>
+    <option value="你能让任何书籍在你阅读时，自动配上轻柔的背景音乐，但曲风永远是你最不喜欢的类型。">自带BGM的书签</option>
+    <option value="你身体的所有毛发（头发、眉毛等）都会根据你的情绪缓慢变色，比如焦虑时变成灰色，开心时是淡黄色，但变化过程需要数小时。">情绪调色板</option>
+    <option value="你能够与真菌（比如蘑菇、霉菌）进行单向的心灵感应，你能感知到它们的“想法”，但它们通常在思考如何更好地腐烂。">真菌通感</option>
+    <option value="你在说谎时，耳朵会变得和精灵一样尖，效果持续到你说出下一句真话为止。">诚实之耳</option>
+    <option value="你能让任何昆虫在你面前跳一段优雅的华尔兹，前提是你能说服它这么做。">昆虫舞蹈家</option>
+    <option value="你能够精确地知道任何一个非生命物体的“年龄”，从它被制造出来的那一刻算起。">万物年轮</option>
+    <option value="你呼出的气中含有微量的、无害的闪光粉尘，在阳光下会显得非常梦幻。">闪光呼吸</option>
+    <option value="你能让任何咸味的食物吃起来像是甜的，反之亦然，但营养成分不变。">味觉倒错</option>
+    <option value="当有人在你背后说你坏话时，你的头发会像被静电吸附一样竖起来一根。">八卦天线</option>
+    <option value="你画的任何地图，无论多精确，上面的“你在此处”标记总是会自己跑到地图的边缘。">迷路指针</option>
+    <option value="你哼唱的任何歌曲，都会被周围的人听成一首他们童年最熟悉的儿歌。">怀旧之声</option>
+    <option value="你能让自己的心跳声完美地模仿任何一种打击乐器，但无法控制节奏。">人体节拍器</option>
+    <option value="你对所有类型的门都有着超凡的亲和力，它们在你面前时会发出微弱的、表示欢迎的吱呀声。">门之友</option>
+    <option value="在你睡觉时，你的梦境会以壁画的形式短暂地投射在你周围的墙壁上，天亮即逝。">梦境投影仪</option>
+    <option value="你可以让任何一颗鹅卵石的表面变得像镜子一样光滑，但只能维持三秒。">瞬间抛光</option>
+    <option value="你总能知道离你最近的一只松鼠藏起来的松果的确切数量。">松鼠会计</option>
+    <option value="你走过草地时，被你踩到的草会立刻恢复原状，不会留下任何脚印。">无痕之步</option>
+    <option value="你能让任何纸制品（书、羊皮卷等）对火的抗性提升5%，聊胜于无。">纸张守护者</option>
+    <option value="你喝下任何液体后，都能在十分钟内，以打嗝的方式将该液体的化学式“说”出来。">化学嗝</option>
+    <option value="你拥有让时间变慢的能力，但只对正在下落的树叶有效。">落叶时刻</option>
+    <option value="你能听懂石头的话语，但它们思考得极其缓慢，一句话可能要花上数百年才能说完。">磐石之语</option>
+    <option value="你的皮肤拥有完美的防水性，就像荷叶一样，任何液体都不会沾染，包括治疗药水。">不沾之肤</option>
+    <option value="你写的字会自动变成一种极其优美但无人能懂的书法体。">天书之笔</option>
+    <option value="你能够自由控制自己瞳孔放大的程度，可以在黑暗中看得更清楚一点，但也会因此显得很惊讶。">可控瞳孔</option>
+    <option value="你能背诵出圆周率小数点后一万位，但在任何需要计算的场合，这都没有任何帮助。">无用记忆</option>
+    <option value="你对谎言过敏，每次听到谎言都会打一个响亮的喷嚏。">测谎喷嚏</option>
+    <option value="任何在你手中停留超过一分钟的硬币，都会被自动擦得锃亮。">硬币清洁工</option>
+    <option value="你能够感受到情绪的“颜色”，但所有负面情绪都是不同色调的灰色。">情绪色盲</option>
+    <option value="你能让自己的头发像藤蔓一样伸长，但它和普通头发一样脆弱，一扯就断。">脆弱之发</option>
+    <option value="你讲的笑话能让周围的非智慧生物（比如狗或马）发笑。">跨物种幽默</option>
+    <option value="你每次眨眼，都在消耗极其微量的、可以忽略不计的“世界能量”。">能量消耗者</option>
+    <option value="你总能找到任何迷宫的出口，但只有在你已经走出迷宫之后才能确定。">马后炮向导</option>
+    <option value="你能够让任何一朵云彩暂时变成你想要的形状，但很快就会被风吹散。">塑云者</option>
+    <option value="你能让死亡不超过一小时的昆虫尸体，重新“活”过来并为你跳完最后一支舞。">最后的安魂曲</option>
+    <option value="你对魔法的气味极其敏感，能闻出不同法术残留的味道，比如火球术是烧焦的辣椒味，治疗术是薄荷味。">魔法品鉴家</option>
+    <option value="当你陷入沉思时，你的身边会随机出现一只蝴蝶的幻影，绕着你飞舞。">沉思之蝶</option>
+    <option value="你永远不会被蚊子叮咬，因为蚊子认为你的血“不好喝”。">蚊子绝缘体</option>
+
+
+    <option value="你能够将小型非魔法物品（如钥匙、匕首）完美地藏在自己的影子里，需要时可以取出。">影子口袋</option>
+    <option value="你能够与自己接触过的、有智慧的生物建立一个临时的精神链接，只能传递“危险”或“安全”两种信号。">紧急信标</option>
+    <option value="你的身体能够缓慢地适应任何环境的温度，无论是极寒还是酷暑，都能保持相对舒适。">恒温动物</option>
+    <option value="你能够通过触摸土壤，感知到周围一公里内是否有大型生物群体活动。">大地脉动</option>
+    <option value="你制作的任何食物或饮品，都会附带轻微的、加速体力恢复的效果。">滋养之手</option>
+    <option value="你能够记住走过的任何一条路，并且可以在脑海中构建出完美的3D地图。">活体地图</option>
+    <option value="你能够通过触摸一件物品，感知到它上一位使用者的强烈情绪。">情感残响</option>
+    <option value="你的声音能够安抚大多数非敌意的野兽，降低它们主动攻击的欲望。">安抚之声</option>
+    <option value="你在人群中不易被注意，只要你不主动与人交谈或做出引人注目的行为，就很容易被忽略。">路人光环</option>
+    <option value="你对自己身体的控制力极强，能够做出匪夷所思的柔韧和平衡动作。">柔骨之躯</option>
+    <option value="你的直觉总能在战斗前一秒，为你警示出最致命的威胁来自何方。">危机嗅觉</option>
+    <option value="你能够模仿任何你听过的声音，包括人声、兽吼和环境音，相似度极高。">万象拟音</option>
+
+
+    <option value="你能够“窃取”他人身上一个非战斗类的熟练技能（如开锁、演奏、手艺），并使用一小时。每天一次。">技能小偷</option>
+    <option value="你能够指定一个半径五米内的区域，让其中的所有魔法效果，无论是增益还是减益，暂时无效化，持续十秒。">沉默领域</option>
+    <option value="你能够将自己的生命力分给他人，快速治愈对方的伤口，但自己会陷入同等程度的虚弱。">生命献祭</option>
+    <option value="你能够在你接触过的任何固体表面留下一个不可见的“空间标记”，你可以随时感知到标记的位置和状态。最多三个。">空间信标</option>
+    <option value="你能够看穿大部分的幻术、变形术和伪装，在你眼中，虚假的存在会呈现出不稳定的轮廓。">真实之眼</option>
+    <option value="每天一次，你可以让时间倒流三秒。只有你自己保留这三秒的记忆。">微小回溯</option>
+    <option value="你能够“解读”武器的记忆，通过触摸一把武器，了解它经历过的最激烈的一场战斗。">兵器通灵</option>
+    <option value="你可以将受到的物理伤害的一部分，以纯粹的能量形式储存起来，并在下一次攻击中释放出去。">能量反刍</option>
+
+
+    <option value="你能够将一个概念“锁定”在一个物体上。例如，将“坚固”的概念锁定在一张纸上，这张纸就无法被撕裂。">概念锚定</option>
+    <option value="你能够与一个平行世界的、选择了不同道路的自己进行短暂的精神交流，获取对方的知识或建议。">镜界沟通</option>
+    <option value="你能够“编辑”非生命物质的基本属性，比如改变一块石头的密度，让它像木头一样轻。效果有限且消耗巨大。">物质编译器</option>
+    <option value="你被世界本身所“偏爱”，当出现概率性的事件时，结果总会向对你有利的方向发生微小的、决定性的偏移。">命运的宠儿</option>
+
+
+    <option value="你散发着一种奇特的信息素，会让所有智慧生物在与你交谈时，不自觉地想要对你说教或纠正你。">好为人师磁铁</option>
+    <option value="所有你持有的金属物品（武器、盔甲、钱币），其腐朽和磨损的速度会加快十倍。">万物锈蚀</option>
+    <option value="你在紧张或恐惧时，会随机与周围的一个物体（比如桌子、石头、尸体）交换位置。">恐慌置换</option>
+    <option value="你释放的任何增益法术（治疗、加持等），都有15%的概率作用到离你最近的敌人身上。">混乱的善意</option>
+    <option value="你的指甲总能长得又快又完美，形状匀称，富有光泽，但硬度和其他人的指甲没什么两样。">完美的指甲生长</option>
+<option value="你拥有出色的回声定位能力，但只能精确定位到你自己发出的声音的来源。">回声定位（伪）</option>
+<option value="你比一般人更容易吸引灰尘，静坐片刻身上就会落上薄薄一层，像一个移动的灰尘收集器。">灰尘亲和力</option>
+<option value="你对视觉上的不对称有种天生的敏感，看到歪斜的画框或不对称的摆设会让你感到难以忍受。">对称强迫症</option>
+<option value="你的皮肤在被按压时，会发出类似捏破气泡膜的、令人愉悦的清脆声响。">气泡膜体质</option>
+<option value="你能听懂植物的语言，但不知为何，它们对你说的似乎总是脏话。">植物语入门</option>
+<option value="你拥有绝对音高，但只在听到别人唱歌跑调时才能准确识别出原调。">绝对音高（反向）</option>
+<option value="当你极度饥饿时，视野中所有圆形或椭圆形的物体看起来都像美味的面包。">食物幻视</option>
+<option value="你的衣物永远不会起皱，但也因此更容易积聚静电。">静态着装</option>
+<option value="在历史悠久的古道上，你偶尔能听到早已逝去之人留下的脚步声回响。">历史的脚步声</option>
+<option value="通过仔细观察苔藓的湿润程度和色泽，你能准确预测接下来三分钟内的天气。">苔藓预报员</option>
+<option value="你能从一个物体上“偷”走一小块颜色，使该处褪色，而你的指尖会沾上那抹洗不掉的色彩。">颜色小偷</option>
+<option value="你的各种情绪会在脑海中自动谱成一段独特的和弦，但你无法分辨和弦具体对应哪种情绪。">情绪和弦</option>
+<option value="所有本该在白天打的喷嚏，都会累积到你睡着之后，以一场喷嚏风暴的形式释放。">延迟喷嚏</option>
+<option value="你随手放在书架上的任何书籍，都会自动与书架边缘和旁边的书本完美对齐。">自动对齐</option>
+<option value="用手捧起任何液体，你都能瞬间感知到其精确的密度数值。">液体密度感知</option>
+<option value="就在你的脸即将撞上蜘蛛网的前零点一秒，你的大脑会收到一次强烈的预警。">蜘蛛网警报</option>
+<option value="你在说话时，总能无意识地、且恰到好处地使用各种双关语和同音异义词。">谐音大师</option>
+<option value="在天气剧烈变化前，你的骨骼会发出微弱的、只有你能听见的信号，内容通常是随机的诗歌朗诵。">骨骼广播</option>
+<option value="你每晚的梦境都会被自动转录成文字，保存在一本你永远找不到的魔法日记里。">梦境存档员</option>
+<option value="你能立刻听出他人话语中的任何语法错误，并产生一股难以抑制的纠正冲动。">语法纠错者</option>
+<option value="只要用毯子把自己完全包裹起来，你就会获得一种“绝对安全”的心理慰藉，物理防御力为零。">毯子堡垒</option>
+<option value="你能清晰地感知到水果从生涩到成熟的喜悦，以及开始腐烂时的悲伤。">水果的情绪</option>
+<option value="在非感冒状态下，你的鼻子总会无意识地朝向正北方。">人体指南针</option>
+<option value="你能将自己的声音灌入一个贝壳中，任何拿到贝壳的人都能听到，但声音无法被再次取出。">单向传音</option>
+<option value="你每次意外摔倒时，姿势总是异常优雅且富有戏剧性，宛如舞台表演。">戏剧性摔倒</option>
+<option value="你可以在脑海中完美地完成冗长的魔法咒语咏唱，但法术并不会因此而触发。">无声咏唱</option>
+<option value="吃完一餐后，你能在口中回味出烹饪者制作这道菜时的主要情绪。">情感余味</option>
+<option value="你拥有过目不忘的能力，但只对天上的云朵有效，你能记住见过的每一朵云的样子。">云朵收藏家</option>
+<option value="被你不小心踩死的昆虫，会在原地留下一朵持续一秒的、由能量构成的微型花朵。">昆虫的敬意</option>
+<option value="使用任何工具给水果削皮，你都能削出一条完整的、从不中断的果皮。">完美削皮</option>
+<option value="你呼出的气流能让附近的灰尘在空中短暂地聚合成随机的、优美的词语。">灰尘诗人</option>
+<option value="任何你投入水中的漂流瓶，最终都会被冲上某个无人知晓的荒岛。">瓶中信使</option>
+<option value="你拥有主动屏蔽半径五米内所有蚊子嗡嗡声的能力。">噪音过滤器</option>
+<option value="当你凝视一个人超过十秒，能看到对方身上模糊的情绪光晕，但颜色和情绪的对应关系每天随机变化。">情绪光晕</option>
+<option value="每天清晨醒来，你的睫毛上总是会挂满晶莹剔透的露珠。">露珠收集者</option>
+<option value="你的皮肤能“记住”上一个接触物体的准确温度，并将其保持一分钟。">温度记忆</option>
+<option value="你的影子能惟妙惟肖地表演你看过的任何皮影戏片段。">影子戏法师</option>
+<option value="当你合上一本尚未读完的书时，你会听到它发出一声微不可闻的叹息。">书本的叹息</option>
+<option value="你可以将任何尝到的味道，在脑海里“翻译”成一段无人能懂的现代诗。">味道翻译家</option>
+<option value="你在山谷中呐喊，听到的回声会自动帮你提升一个八度。">回声变调</option>
+<option value="被你遗忘的食物在发霉时，其霉菌会生长成令人惊叹的美丽图案。">霉菌艺术家</option>
+<option value="任何被你触摸过的石头，都会永久性地比环境温度高出一度。">永恒的温热</option>
+<option value="你吹出的肥皂泡泡在破裂的瞬间，会用极微弱的声音说出“你好”或“再见”。">泡泡语</option>
+<option value="当你尝试解读复杂的密码或谜题时，会立刻感到一阵轻微的头痛。">密码过敏</option>
+<option value="你走路的步频会不自觉地与离你最近的人保持完全一致。">节奏同步</option>
+<option value="在月光下书写，你使用的任何墨水都会散发出淡淡的银光，天亮后即恢复原样。">月光墨水</option>
+<option value="你的头发特别容易积聚静电，可以轻松吸附起小纸片或羽毛。">静态收藏家</option>
+<option value="任何你打算坐下的椅子，都会在你坐下前一分钟自动升温到最舒适的温度。">椅子预热</option>
+<option value="你在水中的倒影，其表情总是比你本人要显得忧郁一些。">倒影的秘密</option>
+<option value="你能通过聆听，感受到歌声的“触感”，比如丝滑、粗糙、温暖或冰冷。">歌声的质感</option>
+<option value="冬天对着窗户哈气，凝结的冰霜会自动形成一幅随机而精致的风景画。">冰霜画手</option>
+<option value="你点燃的任何蜡烛，其火焰都会随着你的心跳节奏同步摇曳。">烛火的舞伴</option>
+<option value="你能感觉到别人说出的谎言带有物理上的“重量”，但无法判断其真伪。">谎言的重量</option>
+<option value="你能准确预知到接下来五分钟内，将会发生的一件最无聊、最没有意义的事情。">无聊的预知</option>
+<option value="在古战场或历史遗迹，你能听到早已消散在风中的、微弱的兵器碰撞与呐喊声。">历史的回响</option>
+<option value="你拥有将任何可堆叠物品（如石头、书籍、盘子）堆到其物理极限高度的卓越能力。">完美的堆叠</option>
+<option value="下雨时，你能清晰分辨每一滴雨水落在不同物体上的音高，并在脑中谱成乐章。">雨滴协奏曲</option>
+<option value="你堆的沙堡异常坚固，能轻松抵御普通海浪的冲刷，直到下一次大涨潮。">沙堡建筑师</option>
+
+<option value="你可以将自己的低语附在微风上，让它清晰地传到顺风方向一百米内指定的人耳中。">微风传话</option>
+<option value="在受到生命威胁时，你能让自己的外表变得和周围环境中的一块普通石头或灌木丛难以区分，持续一分钟，期间无法移动。">应急伪装</option>
+<option value="你对锁具的内部结构有一种天生的直觉，这让你在开锁时成功率大大提高。">锁匠之友</option>
+<option value="你能大致感知到周围智慧生物的情绪状态，如“温暖”代表喜悦，“冰冷”代表恐惧。">情绪温度计</option>
+<option value="通过触摸植物，你能立刻感知到它是否具有药用价值、毒性或可食用性。">草药低语</option>
+<option value="你可以对一个生物施加一个持续一小时的无形标记，在千米范围内都能感知其大致方向。">标记猎物</option>
+<option value="每天一次，你可以选择性地让自己完全忘记一段不超过十分钟的、不愉快的记忆。">记忆橡皮擦</option>
+<option value="你拥有远超常人的伤口处理技巧和速度，能用最简单的工具完成有效的紧急缝合。">快速缝合</option>
+<option value="当你拿起一件工具时，能立刻领悟到它最省力、最有效的使用方式。">工具共鸣</option>
+<option value="通过持续接触，你能缓慢地净化一小捧水，使其达到可安全饮用的标准。">水质净化</option>
+<option value="每天一次，你可以在任何地方瞬间在脑海中明确自己相对于出生点的精确方位。">方向感校准</option>
+<option value="在非饥饿状态下，大多数野兽不会主动攻击你，除非你先表露出强烈的敌意。">野兽的善意</option>
+<option value="在只有星光或月光的微光环境下，你的视力几乎与白天无异。">微光视觉</option>
+<option value="你在睡眠时依然对周围的危险气息保持着最低限度的警觉，更容易被异动惊醒。">警觉之眠</option>
+<option value="在进行交易时，你总能凭直觉判断出对方的报价是公平、占便宜还是敲竹杠。">交易直觉</option>
+<option value="你的消化系统能分解某些通常无法食用的植物根茎，并从中汲取少量能量。">强效消化</option>
+<option value="当你集中精神刻意放轻脚步时，几乎不会发出任何可以被察觉的声音。">无声脚步</option>
+<option value="你对追踪生物留下的痕迹（脚印、断枝、气味残留）有着天生的敏锐直觉。">痕迹追踪</option>
+<option value="你能用随处可见的材料，快速设置出效果显著的、用于捕捉小动物或警示的简易陷阱。">简易陷阱大师</option>
+<option value="通过观察云层、风向和空气湿度的细微变化，你能相当准确地预测未来十二小时的天气。">天气预报员</option>
+
+
+
+<option value="每天一次，你可以选择一个刚刚发生的、影响不大的事件（如打翻水杯），并从因果中“剪除”它，使之从未发生。">因果线剪辑</option>
+<option value="你对某一种元素（火、水、风、土等）有超凡的亲和力，学习和施展该系法术时事半功倍，且威力与控制力显著提升。">元素亲和</option>
+<option value="你能与任何濒死（生命最后一分钟）的生物进行短暂的精神交流，读取他们最后、最强烈的残念或信息。">灵魂低语</option>
+<option value="只要你身处阴影之中，就可以选择性地大幅降低自身的存在感，能有效规避大部分非指向性的侦测。">存在稀释</option>
+<option value="在生命垂危的瞬间，你有一定几率唤醒体内潜藏的古老血脉，短时间内获得强大的力量或一项全新的特殊能力。">血脉觉醒</option>
+<option value="你说出的、以“我承诺”为开头的句子，会对你和聆听者产生微弱的契约束缚力。若你违背，会遭受厄运；若他人帮助你完成，会获得好运。">契约之言</option>
+<option value="亲眼目睹一个非超凡的、纯粹的技巧性动作后（如一次完美的射击、一段复杂的剑舞），你可以在接下来的一分钟内完美复现一次。">绝对模仿</option>
+<option value="你的心智如同一座坚固的堡垒，天生就能抵抗大部分精神探查、心灵控制和情绪操纵类的法术或能力。">心灵壁垒</option>
+<option value="每天可以使用数次，瞬间将自己传送到视线所及的十米内任意一个无障碍的地点。">短距传送</option>
+<option value="你的身体拥有缓慢但持续的自愈能力，所有非致命性的创伤都会以肉眼可见的速度缓慢愈合，且不会留下疤痕。">再生之躯</option>
+
+
+<option value="你施展的所有法术，其威力会不由自主地增加30%，但法力消耗也同时增加100%。">魔法增幅</option>
+<option value="你会强制性地、身临其境地感受到周围所有人的强烈情绪，并会不由自主地在表情和动作上表现出来。">共情过载</option>
+<option value="在战斗中，所有飞行道具（无论敌我）的弹道都有微小的几率向你的身体偏移。">绝对吸引</option>
+<option value="你无法说谎。一旦尝试，你不仅会失败，还会脱口而出另一个更加尴尬或致命的真相。">诚实的代价</option>
+<option value="你持有的任何形式的货币，都会以各种离奇的方式（被偷、遗失、意外损坏、不小心捐赠）迅速地离你而去。">财富斥力</option>
+<option value="当你对他人施展治疗或包扎时，有10%的概率将对方的伤势完美地转移到自己身上。">反向治愈</option>
+<option value="你天生就散发着一种独特的气场，极易被那些身负“天命”或自认“主角”的人视为潜在的竞争对手或必须铲除的障碍。">主角公敌</option>
+<option value="你所有无意中说出的负面猜想（比如“前面该不会有埋伏吧”），其成真的概率会大幅度提升。">言出法随（负面限定）</option>
+<option value="在最关键的时刻，你所依赖的物品（武器、工具、绳索）有一定概率会突然断裂、失灵或脱手。">物品背叛</option>
+<option value="在混乱的战斗中，你的盟友似乎总是会不自觉地将你纳入他们范围攻击的边缘区域。">友军之围</option>  
+
+     <option value="自定义">自定义</option>
+            </select>
+        </div>
+        <div class="form-group" id="custom-talent-group" style="display: none;">
+            <label for="custom-talent-input">自定义天赋描述</label>
+            <input type="text" id="custom-talent-input" class="custom-select" placeholder="请在此处描述你的独特天赋">
+        </div>
+    </div>
+</div>
+</div>
+  <div class="form-section">
+    <h2>队友设置</h2>
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="teammate-count">队友人数</label>
+            <select id="teammate-count" class="custom-select">
+                <option value="-1">随机</option>
+                <option value="0">0人</option>
+                <option value="1">1人</option>
+                <option value="2">2人</option>
+                <option value="3">3人</option>
+                <option value="4">4人</option>
+                <option value="5">5人</option>
+                <option value="6">6人</option>
+                <option value="7">7人</option>
+                <option value="8">8人</option>
+                <option value="9">9人</option>
+                <option value="10">10人</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="teammate-tendency">队友总体倾向</label>
+            <select id="teammate-tendency" class="custom-select">
+                <option value="友善合作">友善合作</option>
+                <option value="中立谨慎">中立谨慎</option>
+                <option value="竞争激烈">竞争激烈</option>
+                <option value="随机生成">随机生成</option>
+                <option value="自定义">自定义队友</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <input type="checkbox" id="is-fixed-team" style="transform: scale(1.2);">
+        <label for="is-fixed-team" style="margin-bottom: 0;">设置为固定轮回小队</label>
+    </div>
+    <div id="custom-teammates-container" class="teammates-container-init">
+        <div style="margin-bottom: 1rem; color: var(--text-secondary-color); font-size: 0.9em;">自定义队友信息（姓名、性格、性别、身份）</div>
+        <div id="teammates-list"></div><div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
+    <button type="button" class="add-teammate-btn" onclick="addTeammate()">+ 添加队友</button>
+    <button id="load-teammates-btn" type="button" class="action-button" style="padding: 0.5rem 1rem; font-size: 0.85em; letter-spacing: 1px; margin: 0; text-transform: none; background-color: var(--secondary-color); flex-grow: 1;">读取预设</button>
+    <button id="save-teammates-btn" type="button" class="action-button" style="padding: 0.5rem 1rem; font-size: 0.85em; letter-spacing: 1px; margin: 0; flex-grow: 1;">保存当前</button>
+</div>  
+    </div>
+</div>
+        <div class="button-container">
+            <button id="next-page-button" class="action-button">[ &lt;下一步：数据构建&gt; ]</button>
+        </div>
+    </div>
+
+
+     <div id="page-2" class="page">
+        <div class="header">
+            <h1>角色数据构建</h1>
+            <div class="subtitle">// 为你的存在注入特质(从0-1需要1点数，1-2需要2点数，以此类推)</div>
+        </div>
+
+
+        <div class="form-group" style="padding: 0 1rem 1.5rem; text-align: center;">
+            <label for="total-points-select" style="margin-bottom: 0.8rem; display: block;">选择初始点数上限</label>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 1rem;">
+                <select id="total-points-select" class="custom-select" style="width: auto;">
+<option value="70">充裕 (70点)</option>
+ <option value="55">标准 (55点)</option>
+                    <option value="40">残疾 (40点)</option>
+                   <option value="0">地狱(0点)</option>
+                    
+                    <option value="custom">自定义</option>
+                </select>
+                <input type="number" id="custom-total-points" min="1" value="70" style="display: none; width: 80px;">
+            </div>
+        </div>
+
+
+         <div class="points-tracker" style="display: flex; align-items: center; justify-content: center; gap: 1.5rem;">
+            <div>剩余点数: <span id="remaining-points">70</span></div>
+
+            <button id="average-points-btn" class="action-button" style="padding: 0.4rem 1rem; font-size: 0.8em; letter-spacing: 1px; margin: 0; text-transform: none;">平均分配</button>
+        </div>
+
+
+          <div class="form-section" style="margin-top: 2rem; margin-bottom: 0.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="template-select" style="margin-bottom: 0.6rem;">读取/管理加点模板</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center;">
+                    <select id="template-select" class="custom-select" style="flex: 1 1 200px;"></select>
+                    <button id="delete-template-btn" class="action-button" style="padding: 0.7rem 1.2rem; font-size: 0.8em; letter-spacing: 1px; margin: 0; text-transform: none; white-space: nowrap; background: linear-gradient(135deg, #8a4e6b, #6b3d52); flex-shrink: 0;">删除</button>
+                </div>
+            </div>
+            <div class="form-group">
+                 <label for="save-template-name" style="margin-bottom: 0.6rem;">保存当前加点为模板</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.8rem;">
+                    <input type="text" id="save-template-name" placeholder="为你的模板命名" style="flex: 1 1 200px;">
+                    <button id="save-template-btn" class="action-button" style="padding: 0.7rem 1.5rem; font-size: 0.9em; letter-spacing: 2px; margin: 0; text-transform: none; white-space: nowrap; flex-shrink: 0;">保存</button>
+                </div>
+            </div>
+        </div>
+
+          <div class="form-section">
+            <h2>概念段</h2>
+            <div id="concept-section" class="form-grid" style="grid-template-columns: 1fr 1fr;">
+
+            </div>
+        </div>
+
+ <div class="form-section">
+            <h2>属性段</h2>
+            <div id="attributes-section">
+
+            </div>
+        </div>
+
+           <div class="form-section">
+            <h2>技能段</h2>
+            <div id="skills-section">
+
+            </div>
+        </div>
+
+        <div class="button-container">
+            <div class="form-group" style="margin-bottom: 1.5rem; text-align: center;">
+        <label for="send-mode-select" style="margin-bottom: 0.5rem;">选择发送模式</label>
+        <select id="send-mode-select" class="custom-select" style="max-width: 250px; margin: 0 auto;">
+            <option value="auto">自动发送</option>
+            <!-- <option value="manual">手动发送</option> -->
+        </select>
+    </div>
+    <button id="init-button" class="action-button">[ <校准并传送> ]</button>
+    <button id="god-space-button" class="action-button secondary-button">[ <于安全区域醒来> ]</button>
+    <button id="custom-action-button" class="action-button" style="background-color: var(--info-color, #4db6ac); border-color: #5a944b;">[ <自定义> ]</button>
+</div>
+
+<div id="custom-action-input-container" style="display: none; margin-top: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+        <input type="checkbox" id="add-world-prefix-checkbox" style="transform: scale(1.2); cursor: pointer;">
+        <label for="add-world-prefix-checkbox" style="margin-bottom: 0; cursor: pointer; user-select: none;">为该指令附加随机世界背景</label>
+    </div>
+    <input type="text" id="custom-action-input" placeholder="请在这里输入你的自定义说明文字" style="width: 100%; box-sizing: border-box;">
+</div>
+<div id="warning-message" class="warning-message" style="display: none; margin-top: 1rem; color: #ffcc00; text-align: center;">
+    提示：参数已上传，正在构建角色数据，你将在短暂的意识模糊后于主神空间醒来，无法立即进入任务。
+</div>
+    </div>
+    </div>
+   
+      
+<div id="main-wrapper">
+ <div class="status-container">
+    <header>
+        <div class="header-content">
+            <div id="update-notifier" style="display: none;">!</div>
+            <h1 id="world-shard">SYSTEM TERMINAL</h1>
+            <div class="header-info-bar">
+    <div class="info-group">
+        <span class="info-item">
+            <span class="info-label">位置:</span>
+            <span id="header-location" class="info-value">--</span>
+        </span>
+        <span class="info-item">
+            <span class="info-label">时间:</span>
+            <span id="header-time" class="info-value">--</span>
+        </span>
+    </div>
+    <div class="info-group">
+        <span class="info-item">
+            <span class="info-label">下次检定:</span>
+            <span id="header-check" class="info-value">--</span>
+        </span>
+        <span class="info-item">
+            <span class="info-label">敌方:</span>
+            <span id="header-combat" class="info-value">--</span>
+        </span>
+        <span class="info-item">
+            <span class="info-label">难度:</span>
+            <span id="header-difficulty" class="info-value">--</span>
+        </span>
+    </div>
+</div>
+ <button id="settings-btn" title="设置">
+    ⚙
+</button>
+ <button id="refresh-btn" title="刷新">
+    ⟲
+</button>
+
+ 
+        </div>
+    </header>
+
+
+
+    <div class="content-area" id="chat-display-area">
+
+    </div>
+<div id="dynamic-content-area" class="dynamic-content-area">
+
+<!-- 外部模块占位，他妈的麻烦啊啊啊啊啊啊啊啊啊啊啊 -->
+    <div id="options-module-container" class="module-container" style="display: none;">
+  <div class="options-container">
+        <div class="choices-container" id="choicesContainer">
+
+        </div>
+    </div>
+
+    <div class="skill-orb-container">
+        <div class="skill-orb" id="skillOrb">術</div>
+    </div>
+    <div class="skill-panel" id="skillPanel">
+        <div class="skill-list" id="skillList">
+            <p style="color: grey; font-size: 14px; text-align: center;">未检测到可用技能</p>
+        </div>
+        <div class="willpower-section">
+            <label class="willpower-label">
+                <span>投入意志力</span>
+                <div class="willpower-input-container">
+                    <input type="number" id="willpowerInput" min="0" value="0">
+                    <span id="willpowerMax">/ 0</span>
+                </div>
+            </label>
+            <div class="skill-info">每点意志力为检定池+1DP</div>
+        </div>
+    </div>
+
+    </div>
+
+<div id="forum-modal-container" class="modal">
+ <div id="forum-modal-content">
+ <button id="forum-modal-close-btn">×</button>
+ <div id="forum-wrapper">
+        <!-- 头部 -->
+        <header class="forum-header">
+            <h1 class="forum-title">轮回者交流终端</h1>
+            <div class="header-controls">
+                <button class="new-post-btn" id="new-post-btn">发布新帖</button>
+ 
+            </div>
+        </header>
+
+ <main class="forum-body" id="forum-body">
+
+    <aside class="forum-sidebar" id="forum-sidebar">
+
+    </aside>
+
+
+    <section class="thread-list-view">
+        <div class="thread-list-header">
+            <span id="current-section-name"></span>
+        </div>
+        <div class="thread-list" id="thread-list">
+
+        </div>
+        <div class="pagination-controls" id="thread-pagination"></div>
+    </section>
+
+
+    <section class="thread-detail-view">
+        <div id="thread-detail-content">
+
+             <div class="detail-placeholder">
+                <div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-secondary-color); opacity: 0.5; margin-bottom: 10px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <p>选择一个帖子查看内容</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+    </div>
+
+    <!-- 发帖模态框 -->
+    <div id="post-modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+            <h2 class="modal-title" id="modal-title">发布新帖</h2>
+            <form id="post-form">
+                <div class="form-group">
+                    <label for="post-section">选择区块</label>
+                    <select id="post-section" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="post-title">帖子标题</label>
+                    <input type="text" id="post-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="post-content-input">帖子内容</label>
+                    <textarea id="post-content-input" required></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="new-post-btn" id="submit-post-btn">确认发布</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+
+<div id='task-summary-modal-container' class = 'modal'>
+  <div id="summary-root" class="task-summary-main-container">
+        <!-- 内容将由JavaScript动态生成 -->
+    </div>
+</div>
+
+</div>
+<!-- 替换原有的成就系统看板HTML -->
+<div id="achievements-modal" class="modal page-modal wide" style="z-index: 99999;">
+    <div class="modal-content page-modal-content">
+        <button class="modal-close">×</button>
+ 
+        <div id="achievements-content" class="page active" style="display: flex; flex-direction: column; gap: 0; padding: 10px;">
+            <!-- 成就列表将由JS动态生成 -->
+            <div style="color: var(--text-secondary-color); text-align: center; padding: 40px;">
+                <div style="font-size: 2em; margin-bottom: 10px;">🏆</div>
+                <p>正在加载成就数据...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+ <div id="zero-level-interface">
+
+<div id="event-tracker-container" class="event-tracker-container"></div>
+
+    <div id="floating-panel-anchor">
+
+        <div id="rp-panel">
+            <div class="check-cards-area">
+                <h3>选择检定项 (最多2项属性/技能, 1项队友协助)<button id="sort-cards-btn" class="sort-button" data-sort-order="desc">LVL ▼</button></h3>
+                <div id="check-cards-slider" class="cards-slider">
+                    <p style="color: grey; padding: 20px 0;">等待加载检定项...</p>
+                </div>
+            </div>
+            <button id="confirm-rp-choice-btn" class="action-button">确认</button>
+        </div>
+    </div>
+
+    <div id="top-left-orbs">
+        <div class="orb top-orb" id="forum-orb-button">坛</div>
+        <div class="orb top-orb" id="task-summary-orb-button">总</div>
+    </div>
+
+    <button id="view-command-btn" class="action-button zero-level-btn" title="查看/编辑待发指令">令</button>
+    <button id="rp-button" class="action-button zero-level-btn" title="RP检定">RP</button>
+
+    <textarea id="user-input" rows="2" placeholder="在这里输入你的行动..."></textarea>
+    <button id="send-button" class="action-button zero-level-btn">➔</button>
+    <button id="reroll-button" class="action-button zero-level-btn">⟲</button>
+</div>
+</div>
+
+
+<div id="orb-container">
+    
+    <div class="orb" data-modal-id="roll-result-modal" id="roll-result-orb">骰</div>
+    
+    <div class="orb" data-modal-id="shop-wrapper-modal" id="shop-wrapper-orb">商</div>
+    <div class="orb" data-modal-id="map-view-modal" id="map-view-orb">图</div>
+     <div class="orb-divider"></div>
+     
+    <div class="orb" id="skill-choice-orb">術</div>
+    <div class="orb" data-modal-id="page-character-modal" id="page-character-orb">能</div>
+ 
+     <div class="orb-divider"></div>
+     <div class="orb" data-modal-id="summary-modal" id="summary-modal-orb">综</div>
+    <div class="orb" id="world-book-orb">识</div>
+ 
+    <div class="orb" data-modal-id="page-task-modal" id="page-task-orb">任</div>
+
+</div>
+
+
+<div id="page-task-modal" class="modal page-modal">
+    <div class="modal-content page-modal-content">
+        <button class="modal-close">×</button>
+        <div class="modal-title">任务详情</div>
+        <div id="page-task" class="page active">
+            <ul class="info-list">
+                
+                <li><span class="label">任务目标</span><span id="task-objective" class="value highlight"></span></li>
+                 <li><span class="label">世界描述</span><span id="info-world-desc" class="value"></span></li>
+                <li><span class="label">任务状态</span><span id="task-status" class="value"></span></li>
+                <li>
+                    <span class="label">任务进度</span>
+                    <div class="value" style="width: 50%;">
+                        <div class="progress-container">
+                            <div class="progress-bar-bg">
+                                <div id="task-progress-bar" class="progress-bar-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                 <li><span class="label">成功奖励</span><span id="task-rewards" class="value"></span></li>
+                <li><span class="label">失败惩罚</span><span id="task-penalties" class="value"></span></li>
+                <li><span class="label">剩余时间</span><span id="task-time-left" class="value"></span></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+
+ <div id="page-character-modal" class="modal page-modal wide">
+    <div class="modal-content page-modal-content">
+        <button class="modal-close">×</button>
+
+
+
+        <div class="char-tabs-nav">
+            <button class="char-tab-btn active" data-tab="status">个人状态</button>
+            <button class="char-tab-btn" data-tab="inventory">行囊与能力</button>
+        </div>
+
+
+        <div id="char-currency-display" class="char-currency-display">
+
+        </div>
+
+
+        <div class="char-tabs-content">
+
+
+            <div id="char-tab-status" class="char-tab-panel active">
+                <div id="page-character" class="page active">
+                    <div class="character-display-grid">
+                        <div class="char-panel left-panel">
+                            <div id="char-display-name" class="char-name-display">阿萨</div>
+                            <div class="char-info-box">
+                                <div class="info-line" data-tooltip-key="status"><span class="info-label">状态</span><span id="char-display-status" class="info-value">正常</span></div>
+                                <div class="info-line" data-tooltip-key="prestige"><span class="info-label">声望</span><span id="char-display-prestige" class="info-value">0</span></div>
+                                <div class="info-line" data-tooltip-key="meide"><span class="info-label">美德</span><span id="char-display-meide" class="info-value">0</span></div>
+                                <div class="info-line" data-tooltip-key="ede"><span class="info-label">恶德</span><span id="char-display-ede" class="info-value">0</span></div>
+                            </div>
+                            <div class="resource-bar-container"><div class="resource-bar-label">生命值</div><div class="progress-bar-bg resource" data-tooltip-key="hp"><div id="char-hp-bar" class="progress-bar-fill hp"></div><span id="char-hp-text" class="progress-bar-text">50/50</span></div></div>
+                            <div class="resource-bar-container"><div class="resource-bar-label">意志力</div><div class="progress-bar-bg resource" data-tooltip-key="willpower"><div id="char-will-bar" class="progress-bar-fill willpower"></div><span id="char-will-text" class="progress-bar-text">0/0</span></div></div>
+                            <div class="resource-bar-container"><div id="char-energy-label" class="resource-bar-label">能量池</div><div class="progress-bar-bg resource" data-tooltip-key="energy"><div id="char-energy-bar" class="progress-bar-fill energy"></div><span id="char-energy-text" class="progress-bar-text">0/0</span></div></div>
+                        </div>
+                        <div class="char-panel center-panel">
+                            <div class="character-figure">
+                                <div class="body-part head"></div><div class="body-part torso"></div><div class="body-part arm left"></div><div class="body-part arm right"></div><div class="body-part leg left"></div><div class="body-part leg right"></div>
+                                <div class="equipment-slot slot-head" data-tooltip-key="equip_head"><span id="equip-head">头部: 无</span></div>
+                                <div class="equipment-slot slot-body" data-tooltip-key="equip_body"><span id="equip-body">身体: 无</span></div>
+                                <div class="equipment-slot slot-hands" data-tooltip-key="equip_hands"><span id="equip-hands">手部: 无</span></div>
+                                <div class="equipment-slot slot-feet" data-tooltip-key="equip_feet"><span id="equip-feet">脚部: 无</span></div>
+                                <div class="equipment-slot slot-accessory" data-tooltip-key="equip_accessory"><span id="equip-accessory">饰品: 无</span></div>
+                                <div class="equipment-slot slot-weapon" data-tooltip-key="equip_weapon"><span id="equip-weapon">手持: 无</span></div>
+                            </div>
+                        </div>
+
+                        <div class="char-panel right-panel" id="main-stats-container">
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div id="char-tab-inventory" class="char-tab-panel">
+                 <div class="inventory-grid">
+                    <div class="inventory-section">
+                        <h3 class="inventory-section-title">行囊物品</h3>
+                        <div id="inventory-items-container" class="items-grid-container">
+
+                        </div>
+                    </div>
+                    <div class="inventory-section">
+                        <h3 class="inventory-section-title">掌握能力</h3>
+                        <div id="other-skills-container" class="skills-grid-container">
+
+                        </div>
+                    </div>
+                </div>
+                 <button id="manage-inventory-btn" class="action-button" style="margin: 15px auto; display: block;">操作行囊</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+
+<div id="map-view-modal" class="modal page-modal wide">
+    <div class="modal-content page-modal-content"  style="max-width: 800px;">
+        <button class="modal-close">×</button>
+        <div class="map-title" id="map-title">区域地图</div>
+        <div id="map-view-content" class="page active">
+             <div id="map-container" class="map-container">
+
+             </div>
+             <div id="external-areas" class="external-areas">
+                    <h3>外部区域</h3>
+                    <div id="external-areas-list" class="external-areas-list">
+
+                    </div>
+             </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="summary-modal" class="modal page-modal">
+     <div class="modal-content page-modal-content">
+        <button class="modal-close">×</button>
+        <div class="modal-title">过往总结</div>
+        <div id="summary-content" class="page active">
+
+        </div>
+    </div>
+</div>
+
+
+<div id="shop-wrapper-modal" class="modal shop-modal">
+
+</div>
+
+
+    <div id="setting-book-wrapper">
+    <div class="setting-book-container">
+
+        <header class="book-header">
+
+            <button id="toggle-sidebar-btn" class="mobile-only-btn">☰</button>
+            <h1 id="content-title">欢迎来到我们的世界</h1>
+
+            <button id="back-to-status-btn">← 返回终端</button>
+        </header>
+
+        <div class="content-wrapper">
+            <nav id="sidebar">
+                <h2>记忆</h2>
+                <div id="navigation-menu">
+
+                </div>
+            </nav>
+
+            <main id="content-display">
+                <div id="content-details">
+                    <p>请从左侧导航栏中选择一个条目来查看详细设定。</p>
+                    <p>这里记录着我们共同创造的每一个角色、每一处风景和每一段故事。愿它能带给你温暖与力量。</p>
+                    <p id="error-message"></p>
+                </div>
+            </main>
+        </div>
+
+
+        <div id="sidebar-overlay"></div>
+    </div>
+</div>
+
+<!-- Inventory Management Modal -->
+<div id="inventory-modal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-title">行囊管理</div>
+        <p class="modal-description" style="font-size: 0.9em; text-align: left;">
+            点击进行管理。
+        </p>
+        <ul id="inventory-item-list" class="inventory-item-list">
+            <!-- 物品列表将在这里动态生成 -->
+        </ul>
+        <button id="delete-item-btn" class="action-button danger" disabled>丢弃选中物品</button>
+         <button id="use-item-btn" class="action-button" disabled>使用选中物品</button>
+    </div>
+</div>
+
+
+<!-- <div id="teammates-modal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">×</button>
+        <div class="modal-title">队友信息</div>
+        <div class="teammates-container">
+            <div class="teammate-list-wrapper">
+                <ul id="teammate-list" class="teammate-list">
+
+                </ul>
+            </div>
+            <div id="teammate-info-display" class="teammate-info-display">
+                <p style="color: var(--text-secondary-color); text-align: center; margin-top: 20px;">请从左侧选择一位队友以查看相关信息。</p>
+            </div>
+        </div>
+    </div>
+</div> -->
+
+<!-- ============================================== -->
+    <!-- ========== 新增：商店界面容器 (开始) ========== -->
+    <!-- ============================================== -->
+    <div id="shop-wrapper">
+        <div class="shop-main-container">
+            <!-- 商店头部 -->
+           <header class="shop-header">
+                <h1 class="shop-title">兑换中心</h1>
+                <div class="shop-header-controls">
+                     <button id="single-gacha-btn" class="control-btn gacha-btn" style="margin-right: 8px;">单抽 (160积分)</button>
+    <button id="ten-gacha-btn" class="control-btn gacha-btn" style="margin-right: 8px;">十连抽 (1440积分)</button>
+                    <button id="generate-items-btn" class="control-btn" style="margin-right: 8px;">生成</button>
+                    <input type="text" id="shop-search-input" placeholder="搜索名称、效果、描述…">
+                    <button id="back-from-shop-btn">← 返回终端</button>
+                </div>
+            </header>
+
+            <!-- 商店主体 -->
+            <div class="shop-body-wrapper">
+                <!-- 左侧：导航和购物车 -->
+                <aside class="shop-sidebar">
+                    <div class="shop-nav">
+                        <h3>商品分区</h3>
+                        <ul class="shop-nav-list">
+                            <li><button class="shop-nav-item active" data-page="fixed">固定兑换</button></li>
+                            <li><button class="shop-nav-item" data-page="random">随机商店</button></li>
+                        </ul>
+                    </div>
+                    <div class="shop-cart">
+                        <h3>购物车</h3>
+                        <div id="cart-items-list">
+                            <p>购物车是空的</p>
+                        </div>
+                        <div id="cart-total">总计: 0 积分</div>
+                        <button id="checkout-button" disabled>确认购买</button>
+                    </div>
+                </aside>
+
+                <!-- 右侧：商品展示区 -->
+                <main class="shop-content-area">
+                    <!-- 固定商品页面 -->
+                    <div id="page-fixed-shop" class="shop-page active">
+                        <div class="shop-controls">
+                            <div class="category-tabs">
+                                <button class="control-btn active" data-section="fixed" data-category="all">全部</button>
+                                <button class="control-btn" data-section="fixed" data-category="物品">物品</button>
+                                <button class="control-btn" data-section="fixed" data-category="技能">技能</button>
+                                <button class="control-btn" data-section="fixed" data-category="基础技能">基础技能</button>
+                                <button class="control-btn" data-section="fixed" data-category="家具">家具</button>
+                            </div>
+                            <div class="sort-controls">
+                                <button class="control-btn active" data-section="fixed" data-sort="asc">价格升序</button>
+                                <button class="control-btn" data-section="fixed" data-sort="desc">价格降序</button>
+                            </div>
+                        </div>
+                        <div class="shop-display-wrapper">
+                            <div id="items-display-list-fixed" class="items-display-list"></div>
+                            <div id="item-details-display-fixed" class="item-details-display">
+                                <div class="detail-placeholder">选择商品查看详情</div>
+                            </div>
+                        </div>
+                        <div id="pagination-fixed" class="shop-pagination"></div>
+                    </div>
+
+                    <!-- 随机商品页面 -->
+                    <div id="page-random-shop" class="shop-page">
+                        <div class="shop-controls">
+                            <div class="category-tabs">
+                                <button class="control-btn active" data-section="random" data-category="all">全部</button>
+                                <button class="control-btn" data-section="random" data-category="物品">物品</button>
+                                <button class="control-btn" data-section="random" data-category="技能">技能</button>
+                                <button class="control-btn" data-section="random" data-category="家具">家具</button>
+                            </div>
+                            <div class="sort-controls">
+                                <button class="control-btn active" data-section="random" data-sort="asc">价格升序</button>
+                                <button class="control-btn" data-section="random" data-sort="desc">价格降序</button>
+                            </div>
+                        </div>
+                         <div class="shop-display-wrapper">
+                            <div id="items-display-list-random" class="items-display-list"></div>
+                            <div id="item-details-display-random" class="item-details-display">
+                                <div class="detail-placeholder">选择商品查看详情</div>
+                            </div>
+                        </div>
+                        <div id="pagination-random" class="shop-pagination"></div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    <!-- 商店模态框 (沿用终端的样式) -->
+    <div id="shop-modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div id="shop-modal-title" class="modal-title">提示</div>
+            <div id="shop-modal-message" class="modal-description"></div>
+        </div>
+    </div>
+
+
+    <!-- 抽奖模态框 -->
+<div id="gacha-modal" class="modal">
+    <div class="modal-content gacha-modal-content">
+        <button class="modal-close">&times;</button>
+        <div id="gacha-modal-title" class="modal-title">抽奖结果</div>
+        <div id="gacha-animation-container" class="gacha-animation-container">
+            
+            <!-- 抽奖动画区域 -->
+        </div>
+        <div id="gacha-results-summary" class="gacha-results-summary"></div>
+        <div id="gacha-results" class="gacha-results">
+            <!-- 抽奖结果显示 -->
+        </div>
+        <button id="gacha-confirm-btn" class="control-btn" style="display: none;">确认</button>
+    </div>
+</div>
+
+    <!-- ========== 新增：商店界面容器 (结束) ========== -->
+<div id="roll-result-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px; width: 90%;">
+        <button class="modal-close">×</button>
+        <div id="roll-result-modal-title" class="modal-title">上一轮投掷详情</div>
+        <div id="roll-result-modal-content" class="modal-description" style="text-align: left; max-height: 70vh; overflow-y: auto; padding-right: 15px;">
+    </div>
+</div>
+
+</div>
+<div id="keyword-modal" class="modal">
+    <div class="modal-content">
+
+        <button class="modal-close">×</button>
+        <h2>额外生成要求</h2>
+        <p>请输入一些关键词或要求（可选），它们将被注入到提示中。例如：“价格低于10000”、“和火焰有关”、“只能是C级的血统”。</p>
+       <textarea id="keyword-input" placeholder="输入关键词，留空则使用默认提示..."></textarea>
+
+
+<div id="model-selector-container" class="model-selector">
+    <span class="selector-label">选择模型:</span>
+    <div class="switch-container">
+        <button id="model-flash" class="switch-btn active" data-model="gemini-2.5-flash">Flash</button>
+        <button id="model-pro" class="switch-btn" data-model="gemini-2.5-pro">Pro</button>
+    </div>
+</div>
+
+
+<div class="modal-buttons">
+    <button id="submit-generation-btn" class="control-btn">开始生成</button>
+    <button id="skip-generation-btn" class="control-btn grey">跳过并生成</button>
+</div>
+    </div>
+</div>
+ 
+
+
+
+
+</div>
+
+<div id="skill-choice-panel" class="modal">
+ <div class="modal-content" style="max-width: 800px; width: 95%;">
+    <button class="modal-close">×</button>
+    <div class="modal-title">发动术式</div>
+
+    <div class="skill-choice-container">
+
+ 
+
+
+        <div class="bottom-section">
+
+
+            <div class="other-skills-group">
+                <h3>可用术法</h3>
+                <div id="other-skills-area" class="skills-list">
+
+                </div>
+            </div>
+
+
+            <div class="willpower-group">
+                <h3>投入意志力</h3>
+                <div class="willpower-display">
+                    <input type="number" id="willpower-input" min="0" value="0" readonly> 
+                    <span id="willpower-max">/ 0</span>
+                </div>
+                <div class="willpower-slider-container">
+                    <input type="range" id="willpower-slider" value="0" min="0" step="1">
+                </div>
+                <div class="skill-info">每点意志力为检定池+1 DP</div>
+            </div>
+
+        </div>
+    </div>
+    <button id="confirm-skill-choice-btn" class="action-button">确认发动</button>
+</div>
+
+</div>
+
+
+    <div id="world-book-modal" class="modal">
+        <div class="book-content">
+            <button class="book-close-btn"> </button>
+            <div class="book-left-page">
+                <div class="book-bookmarks">
+
+                    <div class="bookmark" data-tab="global_npc">全局人物</div>
+                    <div class="bookmark" data-tab="global_settings">全局设定</div>
+                    <div class="bookmark" data-tab="global_背包">你的背包</div>
+                    <div class="bookmark" data-tab="global_其他技能">你的技能</div>
+                    <div class="bookmark" data-tab="group_member">小队信息</div>
+                     <div class="bookmark" data-tab="npc">世界人物</div>
+                    <div class="bookmark active" data-tab="settings">世界设定</div>
+                     <div class="bookmark" data-tab="the_created">$#%</div> 
+                   
+                </div>
+            </div>
+            <div class="book-right-page">
+                <div id="book-display-area" class="book-display-area">
+                    <!-- 内容将在这里动态生成 -->
+                </div>
+                <div class="book-pagination">
+                    <button id="book-prev-page" class="page-turn-btn left">‹</button>
+                    <span id="book-page-info">1 / 1</span>
+                    <button id="book-next-page" class="page-turn-btn right">›</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ========== 新增：世界之书弹窗 (结束) ========== -->
+
+ 
+ <div id="plot-synthesis-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <button class="modal-close">×</button>
+        <div class="modal-title">支线剧情管理</div>
+        <div class="modal-description" style="text-align: left; margin-bottom: 20px;">
+            所有操作将在此处模拟，直到你点击“确认执行”。
+        </div>
+
+
+        <div class="plot-simulation-container">
+            <div id="current-plots-display" class="plot-column">
+                <h4>当前持有</h4>
+
+            </div>
+            <div class="arrow-separator">→</div>
+            <div id="simulated-plots-display" class="plot-column">
+                <h4>操作预览</h4>
+
+            </div>
+        </div>
+
+
+        <div class="synthesis-section">
+            <h4>分解高级支线 (3:1)</h4>
+            <div class="synthesis-controls">
+                <select id="decompose-from-select">
+                    <option value="S">S 级</option>
+                    <option value="A">A 级</option>
+                    <option value="B">B 级</option>
+                    <option value="C">C 级</option>
+                </select>
+                <input type="number" id="decompose-amount-input" min="1" value="1" style="width: 60px;">
+                <button id="execute-decomposition-btn" class="action-button small">↓ 分解</button>
+            </div>
+        </div>
+
+        <div class="synthesis-section">
+            <h4>合成高级支线 (3:1)</h4>
+            <div class="synthesis-controls">
+                <select id="synthesize-to-select">
+                    <option value="C">← C 级 (需 3 D)</option>
+                    <option value="B">← B 级 (需 3 C)</option>
+                    <option value="A">← A 级 (需 3 B)</option>
+                    <option value="S">← S 级 (需 3 A)</option>
+                </select>
+                <input type="number" id="synthesize-amount-input" min="1" value="1" style="width: 60px;">
+                <button id="execute-synthesis-btn" class="action-button small">↑ 合成</button>
+            </div>
+        </div>
+
+
+        <div class="final-actions">
+             <button id="reset-simulation-btn" class="action-button grey">重置操作</button>
+             <button id="confirm-synthesis-btn" class="action-button highlight">确认执行</button>
+        </div>
+    </div>
+</div>
+
+ <div id="context-menu" style="display: none; position: fixed;    padding: 5px; border-radius: 5px; ">
+    <div class="context-menu-item" data-action="edit">编辑</div>
+    <div class="context-menu-item" data-action="delete">删除</div>
+</div>
+  <div id="char-tooltip" class="char-tooltip"></div>
+
+          <div id="location-modal" class="modal">
+            <div class="modal-content" style="max-width: 800px;">
+                <button class="modal-close">&times;</button>
+                <div id="location-modal-title" class="modal-title">地点名称</div>
+                <div id="location-modal-description" class="modal-description">
+                    环境描述将在这里显示
+                </div>
+            </div>
+        </div>
+
+        <div id="command-modal" class="modal">
+    <div class="modal-content" style="width: 90vh; max-width: 800px; max-height: 80vh;">
+        <div class="modal-header">
+            <h2 class="modal-title">编辑待发指令</h2>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+            <p style="color: var(--text-secondary-color); font-size: 14px; margin-bottom: 0;">这些指令将在下次点击“发送”时，附加在你的消息最前方一起发送。</p>
+            <textarea id="command-edit-area" style="width: 100%; height: 250px; background-color: rgba(0,0,0,0.3); color: var(--text-color); border: 1px solid var(--border-color); padding: 10px; box-sizing: border-box; resize: vertical;"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button id="save-command-btn" class="action-button">保存并关闭</button>
+        </div>
+    </div>
+</div>
+
+<div id="roll-result-card-container" class="roll-result-card-container"></div>
+
+
+<div id="settings-modal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close">×</button>
+        <div class="modal-title">系统设置</div>
+        <button id="achievements-btn" title="成就">🏆</button>
+        <button id="debug-clear-achievements" title="清除成就数据(调试用)" style="
+        /* display: none; */
+    background: none;
+    border: 1px solid #ff4444;
+    color: #ff4444;
+    font-size: 0.8em;
+    cursor: pointer;
+    padding: 2px 6px;
+    margin-left: 5px;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+    opacity: 0.6;
+" onmouseover="this.style.opacity='1'; this.style.background='#ff4444'; this.style.color='white';" onmouseout="this.style.opacity='0.6'; this.style.background='none'; this.style.color='#ff4444';">🗑️</button>
+
+ 
+        <div class="settings-container">        <div class="setting-item">
+            <label>界面主题</label>
+            <button id="modal-theme-switcher" class="control-btn">切换主题</button>
+        </div>
+
+                <div class="setting-item">
+            <label>自定义主题</label>
+            <div class="custom-theme-controls">
+                <button id="apply-custom-theme-btn" class="control-btn">应用自定义</button>
+                <button id="edit-custom-theme-btn" class="control-btn" style="margin-left: 10px;">编辑</button>
+            </div>
+        </div>
+
+        <div id="custom-theme-editor" class="setting-item-column" style="display: none;">
+            <label>颜色编辑器</label>
+            <div id="color-picker-container">
+
+            </div>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-top: 10px;">拖动颜色可实时预览效果。</p>
+        </div>
+
+
+        <div class="setting-item">
+            <label for="streaming-toggle">流式传输</label>
+            <div class="switch-container">
+                <button id="streaming-toggle" class="switch-btn" data-state="on">开启</button>
+            </div>
+        </div>
+        <div class="setting-item">
+    <label for="fullscreen-toggle">全屏模式</label>
+    <div class="switch-container">
+
+        <button id="fullscreen-btn" class="switch-btn">进入全屏</button>
+    </div>
+</div>
+
+        <div class="setting-item">
+            <label>数据导入</label>
+            <button id="modal-import-btn" class="control-btn">导入存档</button>
+            <input type="file" id="modal-file-importer" style="display:none" accept=".json">
+        </div>
+        <div id="modal-log-block" class="log-output">等待操作...</div>
+
+        <div class="setting-item">
+            <label>数据导出</label>
+            <button id="modal-export-btn" class="control-btn">导出存档</button>
+        </div>
+        <div id="modal-export-status" class="log-output"></div>
+    </div>
+</div>
+</div>
+
+
+ 

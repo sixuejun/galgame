@@ -1,22 +1,11 @@
 <template>
   <!-- Size selector (when starting new game with multiple sizes) -->
-  <div
-    v-if="showSizeSelect"
-    class="flex flex-col items-center justify-center select-none"
-    :style="rootStyle"
-  >
-    <div
-      class="flex flex-col items-center"
-      style="max-width: 24rem; width: 100%"
-    >
-      <div
-        class="mb-6 w-full border-b-2 border-(--vn-border) pb-1"
-      >
+  <div v-if="showSizeSelect" class="flex flex-col items-center justify-center select-none" :style="rootStyle">
+    <div class="flex flex-col items-center" style="max-width: 24rem; width: 100%">
+      <div class="mb-6 w-full border-b-2 border-(--vn-border) pb-1">
         <div class="flex items-center justify-between">
           <div class="masthead-text">第 MMXLVIII 期</div>
-          <button class="masthead-text cursor-pointer" @click="$emit('close')">
-            ←返回
-          </button>
+          <button class="masthead-text cursor-pointer" @click="$emit('close')">←返回</button>
         </div>
       </div>
 
@@ -27,9 +16,7 @@
         <div class="rule-line flex-1" />
       </div>
 
-      <div class="size-select-label">
-        选择棋盘大小
-      </div>
+      <div class="size-select-label">选择棋盘大小</div>
       <div class="flex gap-3">
         <button
           v-for="s in availableSizes"
@@ -56,19 +43,12 @@
     @mouseup="onMouseUp"
     @mouseleave="onMouseLeave"
   >
-    <div
-      class="flex flex-col items-center"
-      style="max-width: 24rem; width: 100%"
-    >
+    <div class="flex flex-col items-center" style="max-width: 24rem; width: 100%">
       <!-- Masthead -->
-      <div
-        class="mb-2 w-full border-b-2 border-(--vn-border) pb-1"
-      >
+      <div class="mb-2 w-full border-b-2 border-(--vn-border) pb-1">
         <div class="flex items-center justify-between">
           <div class="masthead-text">第 MMXLVIII 期</div>
-          <button class="masthead-text cursor-pointer" @click="handleBack">
-            ←返回
-          </button>
+          <button class="masthead-text cursor-pointer" @click="handleBack">←返回</button>
         </div>
       </div>
 
@@ -96,9 +76,13 @@
             </div>
           </div>
         </div>
-        <div class="flex gap-2">
-          <button class="vn-2048-btn" @click="handleSave">SAVE</button>
-          <button class="vn-2048-btn" @click="handleSettle">SETTLE</button>
+        <div class="flex gap-2" style="margin-right: 0.5rem">
+          <div class="vn-2048-btn-wrap rounded border px-2 py-1" style="border-color: rgba(90, 79, 64, 0.5)">
+            <button class="vn-2048-btn" @click="handleSave">SAVE</button>
+          </div>
+          <div class="vn-2048-btn-wrap rounded border px-2 py-1" style="border-color: rgba(90, 79, 64, 0.5)">
+            <button class="vn-2048-btn" @click="handleSettle">SETTLE</button>
+          </div>
         </div>
       </div>
 
@@ -130,25 +114,21 @@
       </div>
 
       <!-- Grid size indicator -->
-      <div class="grid-size-hint">
-        {{ gridSize }}×{{ gridSize }} · 得分即结算金额
-      </div>
+      <div class="grid-size-hint">{{ gridSize }}×{{ gridSize }} · 得分即结算金额</div>
     </div>
 
     <!-- Game Over overlay -->
-    <div
-      v-if="store.puzzle2048GameOver"
-      class="vn-2048-overlay absolute inset-0 flex items-center justify-center"
-    >
+    <div v-if="store.puzzle2048GameOver" class="vn-2048-overlay absolute inset-0 flex items-center justify-center">
       <div class="vn-2048-dialog">
         <div class="mb-2 w-full border-b border-(--vn-border) pb-2">
           <div class="masthead-text">紧急公告</div>
         </div>
         <h2 class="ink-text-2048 vn-2048-dialog-title">任务失败</h2>
-        <p class="vn-2048-dialog-desc">
-          废土已将你吞噬。最终得分：{{ store.puzzle2048Score }}
-        </p>
-        <div class="flex gap-3">
+        <p class="vn-2048-dialog-desc">废土已将你吞噬。最终得分：{{ store.puzzle2048Score }}</p>
+        <div
+          class="flex gap-3 rounded border px-2 py-1.5"
+          style="border-color: rgba(90, 79, 64, 0.5)"
+        >
           <button class="vn-2048-btn" @click="handleSettle">结算退出</button>
         </div>
       </div>
@@ -164,10 +144,11 @@
           <div class="vn-2048-dialog-accent">特别号外</div>
         </div>
         <h2 class="ink-text-2048 vn-2048-dialog-title">文明重生</h2>
-        <p class="vn-2048-dialog-desc">
-          在绝境中，你集齐了重建所需的一切。得分：{{ store.puzzle2048Score }}
-        </p>
-        <div class="flex gap-3">
+        <p class="vn-2048-dialog-desc">在绝境中，你集齐了重建所需的一切。得分：{{ store.puzzle2048Score }}</p>
+        <div
+          class="flex gap-3 rounded border px-2 py-1.5"
+          style="border-color: rgba(90, 79, 64, 0.5)"
+        >
           <button class="vn-2048-btn" @click="store.acknowledge2048Win()">继续探索</button>
           <button class="vn-2048-btn" @click="handleSettle">结算退出</button>
         </div>
@@ -229,11 +210,7 @@ const cellGapRem = computed(() => {
 });
 
 /* Grid total size (cells + gaps between), no outer padding */
-const gridInnerSize = computed(
-  () =>
-    cellSizeRem.value * gridSize.value +
-    cellGapRem.value * (gridSize.value - 1),
-);
+const gridInnerSize = computed(() => cellSizeRem.value * gridSize.value + cellGapRem.value * (gridSize.value - 1));
 
 /* Board: padding creates inner area = gridInnerSize, so border box = gridInnerSize + 2*gap */
 const boardStyle = computed(() => ({
@@ -527,5 +504,13 @@ function resolveSwipe(dx: number, dy: number) {
   letter-spacing: 0.2em;
   color: var(--rust);
   text-transform: uppercase;
+}
+
+.vn-2048-btn-wrap {
+  transition: transform 0.2s ease;
+}
+
+.vn-2048-btn-wrap:hover {
+  transform: translateY(-2px);
 }
 </style>

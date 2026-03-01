@@ -149,15 +149,23 @@
         <SectionHeader icon="fa-server" title="API 配置" />
         <div class="mb-6 pl-2">
           <!-- Second API -->
-          <div class="mb-4 p-3 border" style="border-color: rgba(90, 79, 64, 0.3); border-radius: 2px">
-            <div class="flex items-center justify-between mb-2">
+          <div class="mb-4 border p-3" style="border-color: rgba(90, 79, 64, 0.3); border-radius: 2px">
+            <div class="mb-2 flex items-center justify-between">
               <span class="text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">第二 API</span>
               <span class="text-xs" :class="'provider-' + store.secondApiStatus">
                 <i class="fa-solid fa-circle" style="font-size: 6px; margin-right: 4px" />
-                {{ store.secondApiStatus === 'available' ? '可用' : store.secondApiStatus === 'degraded' ? '降级' : '未配置' }}
+                {{
+                  store.secondApiStatus === 'available'
+                    ? '可用'
+                    : store.secondApiStatus === 'degraded'
+                      ? '降级'
+                      : '未配置'
+                }}
               </span>
             </div>
-            <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">用于商店刷新、弹幕生成、系统/猜谜等功能</p>
+            <p class="mb-3 text-xs" style="color: var(--vn-muted)">
+              用于商店刷新、弹幕生成、系统/猜谜等功能
+            </p>
             <input
               class="vn-input mb-2"
               placeholder="API URL"
@@ -171,7 +179,7 @@
               :value="store.settings.secondApiKey"
               @input="store.updateSettings({ secondApiKey: ($event.target as HTMLInputElement).value })"
             />
-            <div class="flex gap-2 mb-2">
+            <div class="mb-3 flex gap-2">
               <select
                 class="vn-input flex-1 text-xs"
                 :value="store.settings.secondApiModel"
@@ -181,133 +189,160 @@
                 <option v-for="m in secondApiModelList" :key="m" :value="m">{{ m }}</option>
               </select>
               <button
-                class="px-2 py-1 border text-xs cursor-pointer whitespace-nowrap"
-                style="border-color: rgba(90,79,64,0.4); border-radius: 2px; color: var(--vn-muted)"
+                class="cursor-pointer border px-2 py-1 text-xs whitespace-nowrap"
+                style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
                 :disabled="!store.settings.secondApiUrl?.trim() || loadingModelList"
                 @click="fetchSecondApiModelList"
               >
                 {{ loadingModelList ? '…' : '拉取模型' }}
               </button>
             </div>
-            <div class="flex flex-wrap gap-3 mb-2">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs" style="color: var(--vn-muted)">流式</span>
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="shrink-0 text-xs" style="color: rgba(212, 197, 160, 0.7)">流式</span>
                 <ToggleSwitch
                   :checked="store.settings.secondApiStream"
                   @update="v => store.updateSettings({ secondApiStream: v })"
                 />
               </div>
-              <SliderRow
-                label="温度"
-                :value="typeof store.settings.secondApiTemperature === 'number' ? store.settings.secondApiTemperature : 0.7"
-                :min="0"
-                :max="2"
-                :step="0.1"
-                @update="v => store.updateSettings({ secondApiTemperature: v })"
-              />
-              <div class="flex items-center gap-1 text-xs">
-                <span style="color: var(--vn-muted)">最大长度</span>
-                <input
-                  type="number"
-                  class="vn-input w-16 text-center"
-                  :value="typeof store.settings.secondApiMaxTokens === 'number' ? store.settings.secondApiMaxTokens : ''"
-                  placeholder="unset"
-                  min="1"
-                  @input="e => { const v = (e.target as HTMLInputElement).value; store.updateSettings({ secondApiMaxTokens: v === '' ? 'unset' : Number(v) }); }"
+              <button
+                class="flex cursor-pointer items-center gap-1.5 shrink-0 border px-2.5 py-1 text-xs transition-all"
+                :style="{
+                  borderColor:
+                    store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded'
+                      ? 'var(--rust)'
+                      : 'rgba(90,79,64,0.2)',
+                  color:
+                    store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded'
+                      ? 'var(--vn-fg)'
+                      : 'var(--vn-muted)',
+                  borderRadius: '2px',
+                  opacity: store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded' ? 1 : 0.4,
+                }"
+                :disabled="store.secondApiStatus === 'disabled' || testingSecondApi"
+                @click="testSecondApi"
+              >
+                <i
+                  :class="testingSecondApi ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'"
+                  style="font-size: 0.6rem"
                 />
-              </div>
-              <div class="flex items-center gap-1 text-xs">
-                <span style="color: var(--vn-muted)">Top P</span>
-                <input
-                  type="number"
-                  class="vn-input w-14 text-center"
-                  :value="typeof store.settings.secondApiTopP === 'number' ? store.settings.secondApiTopP : ''"
-                  placeholder="unset"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  @input="e => { const v = (e.target as HTMLInputElement).value; store.updateSettings({ secondApiTopP: v === '' ? 'unset' : Number(v) }); }"
+                <span>{{ secondApiTestResult ?? '测试连接' }}</span>
+              </button>
+            </div>
+            <div class="mb-3 pt-2" style="border-top: 1px solid rgba(90, 79, 64, 0.2)">
+              <p class="mb-2 text-xs" style="color: var(--vn-muted)">生成参数</p>
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-4 py-2">
+                  <span class="w-20 shrink-0 text-xs" style="color: rgba(212, 197, 160, 0.7)">最大回复长度</span>
+                  <input
+                    type="number"
+                    class="vn-input w-24 text-center"
+                    :value="
+                      typeof store.settings.secondApiMaxTokens === 'number' ? store.settings.secondApiMaxTokens : ''
+                    "
+                    placeholder="不设限"
+                    min="1"
+                    @input="
+                      e => {
+                        const v = (e.target as HTMLInputElement).value;
+                        store.updateSettings({ secondApiMaxTokens: v === '' ? 'unset' : Number(v) });
+                      }
+                    "
+                  />
+                </div>
+                <SliderRow
+                  label="温度"
+                  :value="
+                    typeof store.settings.secondApiTemperature === 'number'
+                      ? store.settings.secondApiTemperature
+                      : 0.7
+                  "
+                  :min="0"
+                  :max="2"
+                  :step="0.1"
+                  @update="v => store.updateSettings({ secondApiTemperature: v })"
                 />
-              </div>
-              <div class="flex items-center gap-1 text-xs">
-                <span style="color: var(--vn-muted)">Top K</span>
-                <input
-                  type="number"
-                  class="vn-input w-14 text-center"
-                  :value="typeof store.settings.secondApiTopK === 'number' ? store.settings.secondApiTopK : ''"
-                  placeholder="unset"
-                  min="0"
-                  @input="e => { const v = (e.target as HTMLInputElement).value; store.updateSettings({ secondApiTopK: v === '' ? 'unset' : Number(v) }); }"
+                <SliderRow
+                  label="Top P"
+                  :value="typeof store.settings.secondApiTopP === 'number' ? store.settings.secondApiTopP : 0.9"
+                  :min="0"
+                  :max="1"
+                  :step="0.05"
+                  @update="v => store.updateSettings({ secondApiTopP: v })"
+                />
+                <SliderRow
+                  label="Top K"
+                  :value="typeof store.settings.secondApiTopK === 'number' ? store.settings.secondApiTopK : 40"
+                  :min="0"
+                  :max="200"
+                  :step="1"
+                  @update="v => store.updateSettings({ secondApiTopK: v })"
                 />
               </div>
             </div>
-            <button
-              v-if="store.secondApiStatus === 'degraded'"
-              class="mb-2 px-2 py-1 border text-xs cursor-pointer"
-              style="border-color: var(--rust); border-radius: 2px; color: var(--rust)"
-              @click="store.clearSecondApiDegraded()"
-            >
-              清除降级状态
-            </button>
-            <button
-              class="flex items-center gap-1.5 px-2.5 py-1 border text-xs cursor-pointer transition-all"
-              :style="{
-                borderColor: (store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded') ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
-                color: (store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded') ? 'var(--vn-fg)' : 'var(--vn-muted)',
-                borderRadius: '2px',
-                opacity: (store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded') ? 1 : 0.4,
-              }"
-              :disabled="store.secondApiStatus === 'disabled' || testingSecondApi"
-              @click="testSecondApi"
-            >
-              <i
-                :class="testingSecondApi ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'"
-                style="font-size: 0.6rem"
-              />
-              <span>{{ secondApiTestResult ?? '测试连接' }}</span>
-            </button>
+            <div v-if="store.secondApiStatus === 'degraded'" class="flex flex-wrap gap-2">
+              <button
+                class="cursor-pointer border px-2 py-1 text-xs"
+                style="border-color: var(--rust); border-radius: 2px; color: var(--rust)"
+                @click="store.clearSecondApiDegraded()"
+              >
+                清除降级状态
+              </button>
+            </div>
+            <div class="mt-3 pt-3" style="border-top: 1px solid rgba(90, 79, 64, 0.2)">
+              <button
+                class="w-full cursor-pointer border px-3 py-2 text-xs transition-all mb-2"
+                style="border-color: rgba(90,79,64,0.4); border-radius: 2px; color: var(--vn-muted)"
+                @click="showApiTaskConfig = true"
+              >
+                <i class="fa-solid fa-sliders mr-2" />
+                API 任务分配与生成历史
+              </button>
+              <button
+                class="w-full cursor-pointer border px-3 py-2 text-xs transition-all"
+                style="border-color: rgba(90,79,64,0.4); border-radius: 2px; color: var(--vn-muted)"
+                @click="showWorldbookManager = true"
+              >
+                <i class="fa-solid fa-book mr-2" />
+                世界书管理
+              </button>
+            </div>
           </div>
 
-          <!-- Image API -->
+          <!-- 生图（前端助手事件，需安装支持生图事件的插件） -->
           <div class="p-3 border" style="border-color: rgba(90, 79, 64, 0.3); border-radius: 2px">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">生图 API</span>
-              <span class="text-xs" :class="'provider-' + store.imageApiStatus">
-                <i class="fa-solid fa-circle" style="font-size: 6px; margin-right: 4px" />
-                {{ store.imageApiStatus === 'available' ? '已连接' : '未配置' }}
-              </span>
+              <span class="text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">生图</span>
             </div>
-            <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">用于生成背景或 CG</p>
-            <input
-              class="vn-input mb-2"
-              placeholder="API URL"
-              :value="store.settings.imageApiUrl"
-              @input="store.updateSettings({ imageApiUrl: ($event.target as HTMLInputElement).value })"
-            />
-            <input
-              class="vn-input mb-2"
-              type="password"
-              placeholder="API Key"
-              :value="store.settings.imageApiKey"
-              @input="store.updateSettings({ imageApiKey: ($event.target as HTMLInputElement).value })"
-            />
-            <button
-              class="flex items-center gap-1.5 px-2.5 py-1 border text-xs cursor-pointer transition-all"
-              :style="{
-                borderColor: store.imageApiStatus === 'available' ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
-                color: store.imageApiStatus === 'available' ? 'var(--vn-fg)' : 'var(--vn-muted)',
-                borderRadius: '2px',
-                opacity: store.imageApiStatus === 'available' ? 1 : 0.4,
-              }"
-              :disabled="store.imageApiStatus !== 'available' || testingImageApi"
-              @click="testImageApi"
-            >
-              <i
-                :class="testingImageApi ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'"
-                style="font-size: 0.6rem"
+            <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">
+              通过前端助手事件与外部插件通信，支持流式生图与生成完成后请求生图
+            </p>
+            <div class="flex items-center justify-between py-2">
+              <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">生图总开关</span>
+              <ToggleSwitch
+                :checked="store.settings.imageGenEnabled"
+                @update="v => store.updateSettings({ imageGenEnabled: v })"
               />
-              <span>{{ imageApiTestResult ?? '测试连接' }}</span>
-            </button>
+            </div>
+            <template v-if="store.settings.imageGenEnabled">
+              <div class="flex items-center justify-between py-2">
+                <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">背景生成</span>
+                <ToggleSwitch
+                  :checked="store.settings.backgroundGenEnabled"
+                  @update="v => store.updateSettings({ backgroundGenEnabled: v })"
+                />
+              </div>
+              <div class="flex items-center justify-between py-2">
+                <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">CG 生成</span>
+                <ToggleSwitch
+                  :checked="store.settings.cgGenEnabled"
+                  @update="v => store.updateSettings({ cgGenEnabled: v })"
+                />
+              </div>
+              <p style="font-size: 9px; color: var(--vn-muted); margin-top: 4px">
+                打开后自动启用对应世界书条目。不推荐同时打开背景与 CG。
+              </p>
+            </template>
           </div>
         </div>
 
@@ -360,14 +395,22 @@
       <div :style="decoBottomThin" />
       <div :style="decoBottomThick" />
     </div>
+
+    <!-- API Task Config Panel -->
+    <ApiTaskConfigPanel v-if="showApiTaskConfig" @close="showApiTaskConfig = false" />
+
+    <!-- Worldbook Manager Panel -->
+    <WorldbookManagerPanel v-if="showWorldbookManager" @close="showWorldbookManager = false" />
   </div>
 </template>
 
 <script setup lang="ts">
+import ApiTaskConfigPanel from './ApiTaskConfigPanel.vue';
 import SectionHeader from './SectionHeader.vue';
 import SliderRow from './SliderRow.vue';
 import { useVNStore } from './store';
 import ToggleSwitch from './ToggleSwitch.vue';
+import WorldbookManagerPanel from './WorldbookManagerPanel.vue';
 
 const store = useVNStore();
 
@@ -375,6 +418,8 @@ const testingSecondApi = ref(false);
 const secondApiTestResult = ref<string | null>(null);
 const secondApiModelList = ref<string[]>([]);
 const loadingModelList = ref(false);
+const showApiTaskConfig = ref(false);
+const showWorldbookManager = ref(false);
 
 async function fetchSecondApiModelList() {
   const url = store.settings.secondApiUrl?.trim();
@@ -391,9 +436,6 @@ async function fetchSecondApiModelList() {
     loadingModelList.value = false;
   }
 }
-const testingImageApi = ref(false);
-const imageApiTestResult = ref<string | null>(null);
-
 async function testSecondApi() {
   testingSecondApi.value = true;
   secondApiTestResult.value = null;
@@ -410,26 +452,6 @@ async function testSecondApi() {
     testingSecondApi.value = false;
     setTimeout(() => {
       secondApiTestResult.value = null;
-    }, 4000);
-  }
-}
-
-async function testImageApi() {
-  testingImageApi.value = true;
-  imageApiTestResult.value = null;
-  try {
-    const resp = await fetch(store.settings.imageApiUrl, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${store.settings.imageApiKey}` },
-      signal: AbortSignal.timeout(8000),
-    });
-    imageApiTestResult.value = resp.ok ? '连接成功 ✓' : `失败 (${resp.status})`;
-  } catch {
-    imageApiTestResult.value = '连接失败';
-  } finally {
-    testingImageApi.value = false;
-    setTimeout(() => {
-      imageApiTestResult.value = null;
     }, 4000);
   }
 }
