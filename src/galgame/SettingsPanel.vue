@@ -6,7 +6,7 @@
       @click="store.setOverlay('none')"
     />
 
-    <div class="relative w-full max-w-2xl mx-4 border overflow-hidden animate-fade-in-up" :style="panelStyle">
+    <div class="animate-fade-in-up relative mx-4 w-full max-w-2xl overflow-hidden border" :style="panelStyle">
       <div :style="decoTopThick" />
       <div :style="decoTopThin" />
 
@@ -21,7 +21,7 @@
           <h2 class="text-lg font-bold tracking-widest" style="color: rgba(212, 197, 160, 0.9)">设置</h2>
         </div>
         <button
-          class="w-8 h-8 flex items-center justify-center cursor-pointer transition-colors"
+          class="flex h-8 w-8 cursor-pointer items-center justify-center transition-colors"
           style="color: var(--vn-muted)"
           @click="store.setOverlay('none')"
         >
@@ -30,7 +30,7 @@
       </div>
 
       <!-- Content -->
-      <div class="px-6 py-5 overflow-y-auto no-scrollbar" style="max-height: calc(85vh - 80px)">
+      <div class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: calc(85vh - 80px)">
         <!-- Volume -->
         <SectionHeader icon="fa-volume-high" title="音量设置" />
         <div class="mb-6 pl-2">
@@ -92,6 +92,15 @@
                 @update="v => store.updateSettings({ danmakuSendChatHistory: v })"
               />
             </div>
+            <template v-if="store.settings.danmakuSendChatHistory">
+              <SliderRow
+                label="最多附带层数"
+                :value="store.settings.danmakuChatHistoryDepth"
+                :min="1"
+                :max="currentFloorCount"
+                @update="v => store.updateSettings({ danmakuChatHistoryDepth: v })"
+              />
+            </template>
             <SliderRow
               label="弹幕速度"
               :value="store.settings.danmakuSpeed"
@@ -106,13 +115,13 @@
                 @update="v => store.updateSettings({ danmakuLoop: v })"
               />
             </div>
-            <div class="py-2">
-              <span class="text-xs block mb-2" style="color: rgba(212, 197, 160, 0.7)">显示区域</span>
+            <div class="flex items-center justify-between py-2">
+              <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">显示区域</span>
               <div class="flex gap-2">
                 <button
                   v-for="opt in danmakuDisplayOptions"
                   :key="opt.value"
-                  class="px-3 py-1.5 text-xs border cursor-pointer transition-all"
+                  class="cursor-pointer border px-3 py-1.5 text-xs transition-all"
                   :style="{
                     borderColor: store.settings.danmakuDisplay === opt.value ? 'var(--rust)' : 'rgba(90,79,64,0.4)',
                     background: store.settings.danmakuDisplay === opt.value ? 'rgba(139,69,19,0.15)' : 'transparent',
@@ -154,18 +163,10 @@
               <span class="text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">第二 API</span>
               <span class="text-xs" :class="'provider-' + store.secondApiStatus">
                 <i class="fa-solid fa-circle" style="font-size: 6px; margin-right: 4px" />
-                {{
-                  store.secondApiStatus === 'available'
-                    ? '可用'
-                    : store.secondApiStatus === 'degraded'
-                      ? '降级'
-                      : '未配置'
-                }}
+                {{ store.secondApiStatus === 'available' ? '可用' : '未配置' }}
               </span>
             </div>
-            <p class="mb-3 text-xs" style="color: var(--vn-muted)">
-              用于商店刷新、弹幕生成、系统/猜谜等功能
-            </p>
+            <p class="mb-3 text-xs" style="color: var(--vn-muted)">用于商店刷新、弹幕生成、系统/猜谜等功能</p>
             <input
               class="vn-input mb-2"
               placeholder="API URL"
@@ -186,17 +187,38 @@
                 @change="store.updateSettings({ secondApiModel: ($event.target as HTMLSelectElement).value })"
               >
                 <option value="">选择模型</option>
-                <option v-for="m in secondApiModelList" :key="m" :value="m">{{ m }}</option>
+                <option v-for="m in store.secondApiModelList" :key="m" :value="m">{{ m }}</option>
               </select>
               <button
                 class="cursor-pointer border px-2 py-1 text-xs whitespace-nowrap"
                 style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
-                :disabled="!store.settings.secondApiUrl?.trim() || loadingModelList"
-                @click="fetchSecondApiModelList"
+                :disabled="!store.settings.secondApiUrl?.trim() || store.secondApiModelListLoading"
+                @click="store.fetchSecondApiModelList()"
               >
-                {{ loadingModelList ? '…' : '拉取模型' }}
+                {{ store.secondApiModelListLoading ? '…' : '拉取模型' }}
               </button>
             </div>
+            <div class="mb-3 flex gap-2">
+              <select
+                class="vn-input flex-1 text-xs"
+                :value="store.settings.secondApiPreset"
+                @change="store.updateSettings({ secondApiPreset: ($event.target as HTMLSelectElement).value })"
+              >
+                <option value="">不使用预设（使用默认参数）</option>
+                <option v-for="preset in presetList" :key="preset" :value="preset">{{ preset }}</option>
+              </select>
+              <button
+                class="cursor-pointer border px-2 py-1 text-xs whitespace-nowrap"
+                style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
+                :disabled="loadingPresetList"
+                @click="refreshPresetList"
+              >
+                {{ loadingPresetList ? '…' : '刷新' }}
+              </button>
+            </div>
+            <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">
+              选择预设后，将使用该预设的提示词等配置，但 API 请求仍使用上方配置的第二 API
+            </p>
             <div class="mb-3 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2">
                 <span class="shrink-0 text-xs" style="color: rgba(212, 197, 160, 0.7)">流式</span>
@@ -206,18 +228,12 @@
                 />
               </div>
               <button
-                class="flex cursor-pointer items-center gap-1.5 shrink-0 border px-2.5 py-1 text-xs transition-all"
+                class="flex shrink-0 cursor-pointer items-center gap-1.5 border px-2.5 py-1 text-xs transition-all"
                 :style="{
-                  borderColor:
-                    store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded'
-                      ? 'var(--rust)'
-                      : 'rgba(90,79,64,0.2)',
-                  color:
-                    store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded'
-                      ? 'var(--vn-fg)'
-                      : 'var(--vn-muted)',
+                  borderColor: store.secondApiStatus === 'available' ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
+                  color: store.secondApiStatus === 'available' ? 'var(--vn-fg)' : 'var(--vn-muted)',
                   borderRadius: '2px',
-                  opacity: store.secondApiStatus === 'available' || store.secondApiStatus === 'degraded' ? 1 : 0.4,
+                  opacity: store.secondApiStatus === 'available' ? 1 : 0.4,
                 }"
                 :disabled="store.secondApiStatus === 'disabled' || testingSecondApi"
                 @click="testSecondApi"
@@ -253,9 +269,7 @@
                 <SliderRow
                   label="温度"
                   :value="
-                    typeof store.settings.secondApiTemperature === 'number'
-                      ? store.settings.secondApiTemperature
-                      : 0.7
+                    typeof store.settings.secondApiTemperature === 'number' ? store.settings.secondApiTemperature : 0.7
                   "
                   :min="0"
                   :max="2"
@@ -280,19 +294,10 @@
                 />
               </div>
             </div>
-            <div v-if="store.secondApiStatus === 'degraded'" class="flex flex-wrap gap-2">
-              <button
-                class="cursor-pointer border px-2 py-1 text-xs"
-                style="border-color: var(--rust); border-radius: 2px; color: var(--rust)"
-                @click="store.clearSecondApiDegraded()"
-              >
-                清除降级状态
-              </button>
-            </div>
             <div class="mt-3 pt-3" style="border-top: 1px solid rgba(90, 79, 64, 0.2)">
               <button
-                class="w-full cursor-pointer border px-3 py-2 text-xs transition-all mb-2"
-                style="border-color: rgba(90,79,64,0.4); border-radius: 2px; color: var(--vn-muted)"
+                class="mb-2 w-full cursor-pointer border px-3 py-2 text-xs transition-all"
+                style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
                 @click="showApiTaskConfig = true"
               >
                 <i class="fa-solid fa-sliders mr-2" />
@@ -300,7 +305,7 @@
               </button>
               <button
                 class="w-full cursor-pointer border px-3 py-2 text-xs transition-all"
-                style="border-color: rgba(90,79,64,0.4); border-radius: 2px; color: var(--vn-muted)"
+                style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
                 @click="showWorldbookManager = true"
               >
                 <i class="fa-solid fa-book mr-2" />
@@ -310,8 +315,8 @@
           </div>
 
           <!-- 生图（前端助手事件，需安装支持生图事件的插件） -->
-          <div class="p-3 border" style="border-color: rgba(90, 79, 64, 0.3); border-radius: 2px">
-            <div class="flex items-center justify-between mb-2">
+          <div class="border p-3" style="border-color: rgba(90, 79, 64, 0.3); border-radius: 2px">
+            <div class="mb-2 flex items-center justify-between">
               <span class="text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">生图</span>
             </div>
             <p style="font-size: 9px; color: var(--vn-muted); margin-bottom: 8px">
@@ -339,9 +344,60 @@
                   @update="v => store.updateSettings({ cgGenEnabled: v })"
                 />
               </div>
-              <p style="font-size: 9px; color: var(--vn-muted); margin-top: 4px">
-                打开后自动启用对应世界书条目。不推荐同时打开背景与 CG。
+              <p style="font-size: 9px; color: var(--vn-muted); margin-top: 4px; margin-bottom: 8px">
+                打开后自动启用对应世界书条目。同时打开背景与 CG 时，将根据消息内容判断生成类型，并显示扇形卡牌队列。
               </p>
+              <div v-if="store.settings.backgroundGenEnabled && store.settings.cgGenEnabled" class="py-2">
+                <span class="mb-2 block text-xs" style="color: rgba(212, 197, 160, 0.7)"> 两者都存在时的优先级 </span>
+                <div class="flex gap-2">
+                  <button
+                    class="cursor-pointer border px-3 py-1.5 text-xs transition-all"
+                    :style="{
+                      borderColor: store.settings.imageGenPriority === 'cg' ? 'var(--rust)' : 'rgba(90,79,64,0.4)',
+                      background: store.settings.imageGenPriority === 'cg' ? 'rgba(139,69,19,0.15)' : 'transparent',
+                      color: store.settings.imageGenPriority === 'cg' ? 'var(--vn-fg)' : 'var(--vn-muted)',
+                      borderRadius: '2px',
+                    }"
+                    @click="store.updateSettings({ imageGenPriority: 'cg' })"
+                  >
+                    CG 优先
+                  </button>
+                  <button
+                    class="cursor-pointer border px-3 py-1.5 text-xs transition-all"
+                    :style="{
+                      borderColor:
+                        store.settings.imageGenPriority === 'background' ? 'var(--rust)' : 'rgba(90,79,64,0.4)',
+                      background:
+                        store.settings.imageGenPriority === 'background' ? 'rgba(139,69,19,0.15)' : 'transparent',
+                      color: store.settings.imageGenPriority === 'background' ? 'var(--vn-fg)' : 'var(--vn-muted)',
+                      borderRadius: '2px',
+                    }"
+                    @click="store.updateSettings({ imageGenPriority: 'background' })"
+                  >
+                    背景优先
+                  </button>
+                </div>
+              </div>
+              <div
+                v-if="
+                  store.settings.backgroundGenEnabled && store.settings.cgGenEnabled && store.imageCardQueue.length > 0
+                "
+                class="mt-2 pt-2"
+                style="border-top: 1px solid rgba(90, 79, 64, 0.2)"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">
+                    卡牌队列 ({{ store.imageCardQueue.length }}/10)
+                  </span>
+                  <button
+                    class="cursor-pointer border px-2 py-1 text-xs"
+                    style="border-color: rgba(139, 69, 19, 0.6); border-radius: 2px; color: var(--rust)"
+                    @click="store.clearImageCardQueue()"
+                  >
+                    清空队列
+                  </button>
+                </div>
+              </div>
             </template>
           </div>
         </div>
@@ -353,7 +409,7 @@
             <button
               v-for="skin in SKIN_PRESETS"
               :key="skin.id"
-              class="p-3 border text-left transition-all duration-200 cursor-pointer"
+              class="cursor-pointer border p-3 text-left transition-all duration-200"
               :style="{
                 borderColor: store.settings.skinId === skin.id ? 'var(--rust)' : 'rgba(90,79,64,0.4)',
                 background: store.settings.skinId === skin.id ? 'rgba(139,69,19,0.1)' : 'transparent',
@@ -361,7 +417,7 @@
               }"
               @click="store.updateSettings({ skinId: skin.id })"
             >
-              <div class="text-xs font-bold mb-1" style="color: rgba(212, 197, 160, 0.9)">{{ skin.name }}</div>
+              <div class="mb-1 text-xs font-bold" style="color: rgba(212, 197, 160, 0.9)">{{ skin.name }}</div>
               <div style="font-size: 10px; color: var(--vn-muted)">{{ skin.description }}</div>
               <div
                 v-if="store.settings.skinId === skin.id"
@@ -382,7 +438,7 @@
         <!-- Reset -->
         <div class="pt-4" :style="{ borderTop: '1px solid rgba(90,79,64,0.2)' }">
           <button
-            class="flex items-center gap-2 text-xs cursor-pointer transition-colors"
+            class="flex cursor-pointer items-center gap-2 text-xs transition-colors"
             style="color: var(--vn-muted)"
             @click="handleReset"
           >
@@ -414,46 +470,43 @@ import WorldbookManagerPanel from './WorldbookManagerPanel.vue';
 
 const store = useVNStore();
 
+const currentFloorCount = computed(() => {
+  try {
+    return Math.max(1, getLastMessageId() + 1);
+  } catch {
+    return 100;
+  }
+});
+
 const testingSecondApi = ref(false);
 const secondApiTestResult = ref<string | null>(null);
-const secondApiModelList = ref<string[]>([]);
-const loadingModelList = ref(false);
+const loadingPresetList = ref(false);
+const presetList = ref<string[]>([]);
 const showApiTaskConfig = ref(false);
 const showWorldbookManager = ref(false);
 
-async function fetchSecondApiModelList() {
-  const url = store.settings.secondApiUrl?.trim();
-  const key = store.settings.secondApiKey?.trim();
-  if (!url) return;
-  loadingModelList.value = true;
+function refreshPresetList() {
+  loadingPresetList.value = true;
   try {
-    const list = await getModelList({ apiurl: url, key });
-    secondApiModelList.value = list ?? [];
-  } catch {
-    store.setSecondApiDegraded('model_fetch');
-    secondApiModelList.value = [];
+    presetList.value = getPresetNames();
+    console.info('[SettingsPanel] 获取预设列表:', presetList.value);
+  } catch (e) {
+    console.error('[SettingsPanel] 获取预设列表失败:', e);
+    store.showToast('获取预设列表失败');
   } finally {
-    loadingModelList.value = false;
+    loadingPresetList.value = false;
   }
 }
+
 async function testSecondApi() {
   testingSecondApi.value = true;
   secondApiTestResult.value = null;
-  try {
-    const resp = await fetch(store.settings.secondApiUrl, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${store.settings.secondApiKey}` },
-      signal: AbortSignal.timeout(8000),
-    });
-    secondApiTestResult.value = resp.ok ? '连接成功 ✓' : `失败 (${resp.status})`;
-  } catch {
-    secondApiTestResult.value = '连接失败';
-  } finally {
-    testingSecondApi.value = false;
-    setTimeout(() => {
-      secondApiTestResult.value = null;
-    }, 4000);
-  }
+  const success = await store.testSecondApiConnection();
+  secondApiTestResult.value = success ? '连接成功 ✓' : '连接失败';
+  testingSecondApi.value = false;
+  setTimeout(() => {
+    secondApiTestResult.value = null;
+  }, 4000);
 }
 
 const SKIN_PRESETS = [
@@ -510,7 +563,9 @@ function handleReset() {
     danmakuLoop: false,
     danmakuDisplay: 'third',
     danmakuSendChatHistory: false,
+    danmakuChatHistoryDepth: 10,
     secondApiModel: '',
+    secondApiPreset: '',
     secondApiStream: false,
     secondApiTemperature: 'unset',
     secondApiMaxTokens: 'unset',
@@ -518,4 +573,9 @@ function handleReset() {
     secondApiTopK: 'unset',
   });
 }
+
+// 初始化时加载预设列表
+onMounted(() => {
+  refreshPresetList();
+});
 </script>

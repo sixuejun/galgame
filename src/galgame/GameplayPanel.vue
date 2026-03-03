@@ -74,11 +74,7 @@
       </div>
 
       <!-- Module Grid -->
-      <div
-        ref="moduleGridRef"
-        class="no-scrollbar overflow-y-auto px-6 py-5"
-        style="max-height: calc(85vh - 250px)"
-      >
+      <div ref="moduleGridRef" class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: calc(85vh - 250px)">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <button
             v-for="mod in displayModules"
@@ -153,13 +149,8 @@
                     [ {{ mod.lockReason }} ]
                   </p>
                 </div>
-                <div
-                  v-if="mod.moduleId === 'puzzle_2048'"
-                  class="flex shrink-0 flex-col items-end justify-center"
-                >
-                  <span
-                    style="font-size: 9px; color: var(--stain); font-family: monospace; font-weight: bold"
-                  >
+                <div v-if="mod.moduleId === 'puzzle_2048'" class="flex shrink-0 flex-col items-end justify-center">
+                  <span style="font-size: 9px; color: var(--stain); font-family: monospace; font-weight: bold">
                     {{ puzzleFee > 0 ? `${puzzleFee}G` : '免费' }}
                   </span>
                 </div>
@@ -194,10 +185,7 @@
               >
                 <div class="sys-contact-avatar">
                   <span>{{ p.avatarChar || p.name.charAt(0) }}</span>
-                  <div
-                    v-if="store.unreadPersonalityIds.has(p.id)"
-                    class="sys-contact-online-dot"
-                  />
+                  <div v-if="store.unreadPersonalityIds.has(p.id)" class="sys-contact-online-dot" />
                 </div>
                 <div class="sys-contact-name">{{ p.name }}</div>
               </div>
@@ -218,10 +206,7 @@
                     <i class="fa-solid fa-bolt" style="font-size: 7px" />
                     吐槽
                   </div>
-                  <div
-                    class="sys-msg-bubble"
-                    :class="msg.role === 'user' ? 'sys-bubble-user' : 'sys-bubble-system'"
-                  >
+                  <div class="sys-msg-bubble" :class="msg.role === 'user' ? 'sys-bubble-user' : 'sys-bubble-system'">
                     {{ msg.text }}
                   </div>
                 </div>
@@ -238,7 +223,48 @@
 
             <!-- Input Bar -->
             <div ref="inputBarRef" class="sys-input-bar">
+              <!-- @ Context Tag -->
+              <div v-if="atContextTag" class="sys-at-tag-row">
+                <span class="sys-at-tag">
+                  <i class="fa-solid fa-at" style="font-size:8px;" />
+                  {{ atContextTag }}
+                </span>
+                <button class="sys-at-tag-remove" @click="clearAtContext">
+                  <i class="fa-solid fa-xmark" style="font-size:9px;" />
+                </button>
+              </div>
+              <!-- @ Floor Picker (inline popup) -->
+              <div v-if="showAtPicker" class="sys-at-picker">
+                <div class="sys-at-picker-title">
+                  <i class="fa-solid fa-at" style="font-size:9px;" />
+                  引用楼层（当前共 {{ maxFloorId + 1 }} 楼，0 ~ {{ maxFloorId }}）
+                </div>
+                <div class="sys-at-picker-row">
+                  <input
+                    v-model="atFloorInput"
+                    class="sys-at-input"
+                    placeholder="如：3 或 1-5"
+                    @keydown.enter="confirmAtFloor"
+                    @keydown.esc="showAtPicker = false"
+                  />
+                  <button class="sys-at-confirm-btn" @click="confirmAtFloor">确认</button>
+                  <button class="sys-at-cancel-btn" @click="showAtPicker = false">取消</button>
+                </div>
+                <div style="font-size:9px; color:var(--vn-muted); margin-top:4px; font-family:monospace;">
+                  提示：单楼层填数字，区间填"起-止"
+                </div>
+              </div>
               <div class="sys-input-wrapper">
+                <!-- @ Button -->
+                <button
+                  class="sys-at-btn"
+                  :class="{ 'sys-at-btn-active': atContextTag }"
+                  :disabled="!store.activePersonalityId"
+                  :title="'引用楼层内容作为剧情参考'"
+                  @click="toggleAtPicker"
+                >
+                  <i class="fa-solid fa-at" style="font-size:0.85rem;" />
+                </button>
                 <input
                   v-model="systemChatInput"
                   class="sys-chat-input"
@@ -246,6 +272,15 @@
                   :disabled="!store.activePersonalityId || systemChatSending"
                   @keydown.enter="sendSystemMessage"
                 />
+                <!-- Debug: view prompts -->
+                <button
+                  v-if="store.lastSystemPrompts.length > 0"
+                  class="sys-debug-btn"
+                  title="查看上次发送的提示词"
+                  @click="showPromptDebug = true"
+                >
+                  <i class="fa-solid fa-eye" style="font-size:0.75rem;" />
+                </button>
                 <button
                   class="sys-send-btn"
                   :disabled="!systemChatInput.trim() || !store.activePersonalityId || systemChatSending"
@@ -258,6 +293,32 @@
                     <i class="fa-solid fa-paper-plane sys-send-icon" />
                   </template>
                 </button>
+              </div>
+            </div>
+
+            <!-- Prompt Debug Overlay -->
+            <div v-if="showPromptDebug" class="sys-prompt-debug-overlay" @click.self="showPromptDebug = false">
+              <div class="sys-prompt-debug-panel">
+                <div class="sys-prompt-debug-header">
+                  <span><i class="fa-solid fa-terminal" style="margin-right:6px;color:var(--rust);" />上次发送给第二API的提示词</span>
+                  <button class="sys-prompt-debug-close" @click="showPromptDebug = false">
+                    <i class="fa-solid fa-xmark" />
+                  </button>
+                </div>
+                <div class="sys-prompt-debug-body">
+                  <div
+                    v-for="(p, i) in store.lastSystemPrompts"
+                    :key="i"
+                    class="sys-prompt-block"
+                    :class="'sys-prompt-' + p.role"
+                  >
+                    <div class="sys-prompt-role-label">{{ p.role.toUpperCase() }}</div>
+                    <pre class="sys-prompt-content">{{ p.content }}</pre>
+                  </div>
+                </div>
+                <div class="sys-prompt-debug-footer">
+                  提示词结构：System → History → Context（@引用）→ User Input
+                </div>
               </div>
             </div>
           </div>
@@ -309,6 +370,69 @@ const systemChatInput = ref('');
 const systemChatSending = ref(false);
 const chatMode = ref(false);
 const transitioning = ref(false);
+
+// --- @ Floor picker ---
+const showAtPicker = ref(false);
+const atFloorInput = ref('');
+const atContextTag = ref('');   // e.g. "楼层 3" or "楼层 1-5"
+const atContextText = ref('');  // actual content to inject
+
+const maxFloorId = computed(() => {
+  try { return getLastMessageId(); } catch { return 0; }
+});
+
+function toggleAtPicker() {
+  showAtPicker.value = !showAtPicker.value;
+  if (showAtPicker.value) atFloorInput.value = '';
+}
+
+async function confirmAtFloor() {
+  const raw = atFloorInput.value.trim();
+  if (!raw) return;
+  const rangeMatch = raw.match(/^(\d+)-(\d+)$/);
+  const singleMatch = raw.match(/^(\d+)$/);
+  let floorRange = '';
+  let messages: { role: string; message: string }[] = [];
+  try {
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1]!);
+      const end = parseInt(rangeMatch[2]!);
+      floorRange = `${start}-${end}`;
+      messages = getChatMessages(`${start}-${end}`);
+    } else if (singleMatch) {
+      const floor = parseInt(singleMatch[1]!);
+      floorRange = `${floor}`;
+      messages = getChatMessages(floor);
+    } else {
+      return;
+    }
+  } catch {
+    return;
+  }
+  if (!messages.length) {
+    atContextTag.value = `楼层 ${floorRange}（无内容）`;
+    atContextText.value = '';
+    showAtPicker.value = false;
+    return;
+  }
+  // Build context text from message bodies
+  const parts = messages.map(m => {
+    const role = m.role === 'assistant' ? 'AI' : '用户';
+    const text = (m.message ?? '').replace(/<[^>]+>/g, '').trim();
+    return `[${role}] ${text}`;
+  }).filter(s => s.replace(/\[.*?\]\s*/, '').length > 0);
+  atContextText.value = parts.join('\n\n');
+  atContextTag.value = `楼层 ${floorRange}（${parts.length} 条）`;
+  showAtPicker.value = false;
+}
+
+function clearAtContext() {
+  atContextTag.value = '';
+  atContextText.value = '';
+}
+
+// --- Prompt debug viewer ---
+const showPromptDebug = ref(false);
 
 const moduleGridRef = ref<HTMLElement>();
 const systemChatRef = ref<HTMLElement>();
@@ -404,21 +528,29 @@ async function openSystemChat() {
   }
 
   if (chatAreaRef.value) {
-    tl.from(chatAreaRef.value, {
-      opacity: 0,
-      x: 20,
-      duration: 0.35,
-      ease: 'power2.out',
-    }, '-=0.3');
+    tl.from(
+      chatAreaRef.value,
+      {
+        opacity: 0,
+        x: 20,
+        duration: 0.35,
+        ease: 'power2.out',
+      },
+      '-=0.3',
+    );
   }
 
   if (inputBarRef.value) {
-    tl.from(inputBarRef.value, {
-      y: 40,
-      opacity: 0,
-      duration: 0.38,
-      ease: 'back.out(1.5)',
-    }, '-=0.2');
+    tl.from(
+      inputBarRef.value,
+      {
+        y: 40,
+        opacity: 0,
+        duration: 0.38,
+        ease: 'back.out(1.5)',
+      },
+      '-=0.2',
+    );
   }
 
   await tl;
@@ -438,20 +570,28 @@ async function closeSystemChat() {
   }
 
   if (chatAreaRef.value) {
-    tl.to(chatAreaRef.value, {
-      opacity: 0,
-      x: 15,
-      duration: 0.2,
-    }, '-=0.12');
+    tl.to(
+      chatAreaRef.value,
+      {
+        opacity: 0,
+        x: 15,
+        duration: 0.2,
+      },
+      '-=0.12',
+    );
   }
 
   if (contactsRef.value) {
-    tl.to(contactsRef.value, {
-      x: -130,
-      opacity: 0,
-      duration: 0.28,
-      ease: 'power2.in',
-    }, '-=0.12');
+    tl.to(
+      contactsRef.value,
+      {
+        x: -130,
+        opacity: 0,
+        duration: 0.28,
+        ease: 'power2.in',
+      },
+      '-=0.12',
+    );
   }
 
   await tl;
@@ -506,8 +646,10 @@ async function sendSystemMessage() {
   if (!text || !pid) return;
   systemChatSending.value = true;
   systemChatInput.value = '';
+  const context = atContextText.value || undefined;
+  clearAtContext();
   try {
-    await store.sendSystemUserMessage(pid, text);
+    await store.sendSystemUserMessage(pid, text, context ? { context } : undefined);
     scrollChatToBottom();
   } finally {
     systemChatSending.value = false;
@@ -568,8 +710,12 @@ watch(
 }
 
 @keyframes sys-scanline-drift {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(4px); }
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(4px);
+  }
 }
 
 .sys-terminal-dot {
@@ -588,8 +734,15 @@ watch(
 }
 
 @keyframes sys-dot-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(139, 69, 19, 0.4); }
-  50% { opacity: 0.6; box-shadow: 0 0 10px rgba(139, 69, 19, 0.6); }
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 4px rgba(139, 69, 19, 0.4);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 10px rgba(139, 69, 19, 0.6);
+  }
 }
 
 .sys-terminal-label {
@@ -618,8 +771,14 @@ watch(
 }
 
 @keyframes sys-badge-blink {
-  0%, 80%, 100% { opacity: 1; }
-  90% { opacity: 0.4; }
+  0%,
+  80%,
+  100% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.4;
+  }
 }
 
 /* === System Chat Wrapper === */
@@ -818,7 +977,7 @@ watch(
 
 /* === Input Bar === */
 .sys-input-bar {
-  padding: 10px 16px 12px;
+  padding: 8px 16px 12px;
   border-top: 1px solid rgba(90, 79, 64, 0.2);
   background: rgba(35, 30, 26, 0.3);
 }
@@ -827,6 +986,226 @@ watch(
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+/* @ tag row */
+.sys-at-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+.sys-at-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--stain);
+  background: rgba(196, 162, 101, 0.1);
+  border: 1px solid rgba(196, 162, 101, 0.3);
+  border-radius: 3px;
+  padding: 2px 7px;
+}
+.sys-at-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(90, 79, 64, 0.3);
+  color: var(--vn-muted);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.sys-at-tag-remove:hover { background: rgba(139,69,19,0.3); color: var(--rust); }
+
+/* @ picker */
+.sys-at-picker {
+  background: rgba(42, 36, 32, 0.95);
+  border: 1px solid rgba(139, 69, 19, 0.3);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.sys-at-picker-title {
+  font-size: 9px;
+  font-family: monospace;
+  color: var(--stain);
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.sys-at-picker-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.sys-at-input {
+  flex: 1;
+  height: 26px;
+  background: rgba(74, 64, 53, 0.4);
+  border: 1px solid rgba(90, 79, 64, 0.5);
+  color: var(--vn-fg);
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  outline: none;
+  font-family: monospace;
+}
+.sys-at-input:focus { border-color: rgba(139,69,19,0.6); }
+.sys-at-confirm-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 10px;
+  background: rgba(139,69,19,0.2);
+  border: 1px solid rgba(139,69,19,0.4);
+  color: var(--rust);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.sys-at-confirm-btn:hover { background: rgba(139,69,19,0.35); }
+.sys-at-cancel-btn {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid rgba(90,79,64,0.3);
+  color: var(--vn-muted);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.sys-at-cancel-btn:hover { background: rgba(90,79,64,0.15); }
+
+/* @ button */
+.sys-at-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 34px;
+  border: 1px solid rgba(90,79,64,0.4);
+  background: rgba(74,64,53,0.25);
+  color: var(--vn-muted);
+  border-radius: 17px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.sys-at-btn:hover:not(:disabled) { color: var(--stain); border-color: rgba(196,162,101,0.5); background: rgba(196,162,101,0.08); }
+.sys-at-btn-active { color: var(--stain) !important; border-color: rgba(196,162,101,0.5) !important; background: rgba(196,162,101,0.1) !important; }
+.sys-at-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* debug eye button */
+.sys-debug-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 34px;
+  border: 1px solid rgba(90,79,64,0.35);
+  background: transparent;
+  color: rgba(139,125,107,0.6);
+  border-radius: 17px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.sys-debug-btn:hover { color: var(--stain); border-color: rgba(196,162,101,0.4); }
+
+/* Prompt debug overlay */
+.sys-prompt-debug-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(20,16,12,0.8);
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px;
+  overflow-y: auto;
+}
+.sys-prompt-debug-panel {
+  width: 100%;
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(35,30,26,0.98);
+  border: 1px solid rgba(139,69,19,0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.sys-prompt-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(90,79,64,0.3);
+  font-size: 10px;
+  font-family: monospace;
+  color: rgba(212,197,160,0.8);
+  letter-spacing: 0.05em;
+}
+.sys-prompt-debug-close {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--vn-muted);
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+}
+.sys-prompt-debug-close:hover { color: var(--rust); }
+.sys-prompt-debug-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sys-prompt-block {
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+.sys-prompt-system { border-color: rgba(139,69,19,0.35); background: rgba(139,69,19,0.07); }
+.sys-prompt-user   { border-color: rgba(90,79,64,0.3); background: rgba(74,64,53,0.15); }
+.sys-prompt-assistant { border-color: rgba(90,122,74,0.25); background: rgba(90,122,74,0.06); }
+.sys-prompt-role-label {
+  font-size: 8px;
+  font-family: monospace;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(90,79,64,0.2);
+}
+.sys-prompt-system .sys-prompt-role-label { color: var(--rust); }
+.sys-prompt-user .sys-prompt-role-label { color: var(--stain); }
+.sys-prompt-assistant .sys-prompt-role-label { color: var(--vn-success); }
+.sys-prompt-content {
+  font-size: 10px;
+  font-family: 'Noto Serif SC', monospace;
+  color: rgba(212,197,160,0.8);
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 6px 8px;
+  margin: 0;
+  line-height: 1.6;
+}
+.sys-prompt-debug-footer {
+  padding: 6px 12px;
+  border-top: 1px solid rgba(90,79,64,0.2);
+  font-size: 9px;
+  font-family: monospace;
+  color: rgba(139,125,107,0.5);
+  letter-spacing: 0.03em;
 }
 
 .sys-chat-input {

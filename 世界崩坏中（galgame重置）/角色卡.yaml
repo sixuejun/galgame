@@ -1,0 +1,370 @@
+# yaml-language-server: $schema=https://testingcf.jsdelivr.net/gh/StageDog/tavern_sync/dist/schema/character.zh.json
+头像: 头像
+版本: ''
+作者: ''
+备注: ''
+
+第一条消息:
+  - 文件: 第一条消息\0
+
+角色描述: ''
+
+锚点: {}
+
+世界书名称: 世界崩坏中
+条目:
+  - 名称: '[InitVar]初始化变量'
+    启用: false
+    激活策略:
+      类型: 绿灯
+    插入位置:
+      类型: 角色定义之前
+      顺序: 321
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\[InitVar]初始化变量
+
+  - 名称: 顶部状态栏
+    启用: false
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 1
+      顺序: 320
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\顶部状态栏
+
+  - 名称: 知春困角色激活
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 知春困
+        - 树屋
+        - 林荫
+        - 鹦鹉
+        - 书
+        - 异能
+    插入位置:
+      类型: 角色定义之前
+      顺序: 80
+    激活概率: 100
+    递归:
+      不可被其他条目激活: true
+      不可激活其他条目: false
+    文件: 世界书\知春困角色激活
+
+  - 名称: 殷姒角色激活
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 殷姒
+        - 发小
+        - 竹马
+        - 研究员
+    插入位置:
+      类型: 角色定义之前
+      顺序: 80
+    激活概率: 100
+    递归:
+      不可被其他条目激活: true
+      不可激活其他条目: false
+    文件: 世界书\殷姒角色激活
+
+  - 名称: 珠罗刹角色激活
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 珠罗刹
+        - 反派
+        - 幸存者
+        - 对手
+        - 讨厌
+        - 蜘蛛
+        - 催眠
+        - 异能
+    插入位置:
+      类型: 角色定义之前
+      顺序: 80
+    激活概率: 100
+    递归:
+      不可被其他条目激活: true
+      不可激活其他条目: false
+    文件: 世界书\珠罗刹角色激活
+
+  - 名称: 知春困
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 【【知春困】】
+    插入位置:
+      类型: 角色定义之后
+      顺序: 99
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\知春困
+
+  - 名称: 珠罗刹
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 【【珠罗刹】】
+    插入位置:
+      类型: 角色定义之后
+      顺序: 99
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\珠罗刹
+
+  - 名称: 青梅竹马一定会赢
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 【【殷姒】】
+    插入位置:
+      类型: 角色定义之后
+      顺序: 100
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\青梅竹马一定会赢
+
+  - 名称: 变量提示
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 1
+      顺序: 100
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\变量提示
+
+  - 名称: 鹦鹉小满！
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - 【【知春困】】
+        - 小满
+        - 鹦鹉
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 2
+      顺序: 999
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\鹦鹉小满！
+
+  - 名称: 变量.世界崩坏程度
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 2
+      顺序: 311
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\变量.世界崩坏程度
+
+  - 名称: 变量.当前阶段和事件大纲
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 2
+      顺序: 310
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\变量.当前阶段和事件大纲
+
+  - 名称: 变量.冷却计数
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 2
+      顺序: 309
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\变量.冷却计数
+
+  - 名称: 异度空间
+    启用: true
+    激活策略:
+      类型: 蓝灯
+      关键字:
+        - 异能
+        - 空间
+    插入位置:
+      类型: 角色定义之前
+      顺序: 300
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\异度空间
+
+  - 名称: 状态系统
+    启用: true
+    激活策略:
+      类型: 蓝灯
+      关键字:
+        - 状态
+    插入位置:
+      类型: 角色定义之前
+      顺序: 308
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\状态系统
+
+  - 名称: NPC生成系统
+    启用: true
+    激活策略:
+      类型: 绿灯
+      关键字:
+        - NPC
+        - 路人
+        - 反派
+        - 其他幸存者
+        - 危机
+        - 幸存者
+        - 其他人
+        - 怪物
+        - 变异
+    插入位置:
+      类型: 角色定义之前
+      顺序: 307
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: false
+    文件: 世界书\NPC生成系统
+
+  - 名称: 角色规范
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: 系统
+      深度: 2
+      顺序: 999
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\角色规范
+
+  - 名称: 变量更新规则
+    启用: true
+    激活策略:
+      类型: 蓝灯
+    插入位置:
+      类型: 指定深度
+      角色: AI
+      深度: 0
+      顺序: 304
+    激活概率: 100
+    递归:
+      不可被其他条目激活: false
+      不可激活其他条目: true
+    文件: 世界书\变量更新规则
+
+扩展字段:
+  正则: []
+
+  酒馆助手:
+    脚本库:
+      - 名称: 流式楼层界面-实时修改
+        id: c31ec9dd-e5cc-4db2-be93-60953077fec3
+        启用: true
+        类型: 脚本
+        内容: import 'http://localhost:5500/dist/galgame/index.js'
+        数据:
+          textSpeed: 5
+          autoPlaySpeed: 5
+          autoPlay: false
+          bgmVolume: 70
+          sfxVolume: 80
+          voiceVolume: 100
+          portraitMode: false
+          skinId: newspaper-default
+          danmakuEnabled: true
+          danmakuSpeed: 5
+          danmakuLoop: true
+          danmakuDisplay: full
+          danmakuSendChatHistory: false
+          secondApiUrl: ''
+          secondApiKey: ''
+          secondApiModel: ''
+          secondApiStream: false
+          secondApiTemperature: unset
+          secondApiMaxTokens: 1
+          secondApiTopP: unset
+          secondApiTopK: unset
+          imageApiUrl: ''
+          imageApiKey: ''
+          imageGenEnabled: false
+          backgroundGenEnabled: false
+          cgGenEnabled: false
+          summarySmallInterval: 5
+          summaryBigThreshold: 6
+          summaryAutoEnabled: true
+          summaryApiType: second
+          apiTaskDanmaku: second
+          apiTaskSummary: second
+          apiTaskImageTag: second
+          apiTaskVariable: main
+
+      - 名称: 同步脚本
+        id: 66ff098b-077f-436d-9fd1-4b8fc590b38b
+        启用: true
+        类型: 脚本
+        内容: import
+          'https://testingcf.jsdelivr.net/gh/StageDog/tavern_sync/dist/script.js'
+        数据:
+          url: http://localhost:6620
+          延迟: 100
+          should_notify: true
+          notify_for_character: true
+
+    变量: {}

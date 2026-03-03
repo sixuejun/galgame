@@ -6,8 +6,31 @@
       @click="handleBackdropClose"
     />
 
+    <!-- Special: board game needs a wide panel -->
+    <template v-if="moduleId === 'board_game'">
+      <div
+        class="relative mx-4 border overflow-hidden animate-fade-in-up"
+        :style="boardGamePanel"
+      >
+        <div
+          :style="{ height: '3px', background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)' }"
+        />
+        <div class="flex items-center justify-between px-5 py-2.5" :style="{ borderBottom: '1px solid rgba(90,79,64,0.3)' }">
+          <div class="flex items-center gap-3">
+            <span style="color:var(--rust)"><i class="fa-solid fa-dice-d6" style="font-size:0.9rem" /></span>
+            <h2 class="text-sm font-bold tracking-widest" style="color:rgba(212,197,160,0.9)">废土行路</h2>
+          </div>
+          <button class="flex items-center gap-1 text-xs cursor-pointer" style="color:var(--vn-muted)" @click="$emit('close')">
+            <i class="fa-solid fa-arrow-left" style="font-size:0.75rem" />
+            <span>返回</span>
+          </button>
+        </div>
+        <BoardGameModule />
+      </div>
+    </template>
+
     <!-- Special: 2048 fills the window with its own header -->
-    <template v-if="moduleId === 'puzzle_2048'">
+    <template v-else-if="moduleId === 'puzzle_2048'">
       <div
         class="relative mx-4 border overflow-hidden animate-fade-in-up"
         :style="puzzle2048Panel"
@@ -106,6 +129,7 @@
 
 <script setup lang="ts">
 import type { GameModule } from './store';
+import BoardGameModule from './BoardGameModule.vue';
 import GoldLogModule from './GoldLogModule.vue';
 import InventoryModule from './InventoryModule.vue';
 import Puzzle2048Module from './Puzzle2048Module.vue';
@@ -150,6 +174,17 @@ const puzzle2048Panel = {
   borderColor: 'var(--vn-border)',
   background: 'var(--vn-bg)',
   overflow: 'auto' as const,
+};
+
+const boardGamePanel = {
+  maxHeight: '90vh',
+  maxWidth: '900px',
+  width: '100%',
+  borderColor: 'rgba(90,79,64,0.6)',
+  background: 'var(--vn-panel-bg)',
+  backdropFilter: 'blur(12px)',
+  display: 'flex' as const,
+  flexDirection: 'column' as const,
 };
 
 function handleBackdropClose() {

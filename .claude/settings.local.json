@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(pnpm run:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(rm:*)",
+      "Bash(python3:*)",
+      "Bash(node:*)"
     ]
   }
 }

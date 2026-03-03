@@ -1,56 +1,41 @@
 <template>
-  <div v-if="currentLine" class="relative w-full" @click="handleClickText">
+  <div v-if="currentBlock" class="relative w-full" @click="handleClickText">
     <div class="relative mx-3 md:mx-8 lg:mx-16">
       <div
         class="relative border backdrop-blur-sm"
         :style="{
           borderColor: 'rgba(90,79,64,0.6)',
-          background: 'var(--vn-dialogue-bg)',
+          background: currentBlock.type === 'blacktext' ? 'rgba(0,0,0,0.95)' : 'var(--vn-dialogue-bg)',
           boxShadow: 'inset 0 0 30px rgba(42,36,32,0.3), 0 4px 12px rgba(0,0,0,0.4)',
         }"
       >
-        <!-- Top decorative lines -->
-        <div :style="{ height:'3px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.4), transparent)' }" />
-        <div :style="{ height:'1px', marginTop:'2px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
+        <!-- Top decorative lines (hidden for blacktext) -->
+        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'3px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.4), transparent)' }" />
+        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'1px', marginTop:'2px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
 
         <div class="flex items-stretch">
-          <!-- User avatar (conditional) -->
-          <div
-            v-if="layoutMode === 'withAvatar'"
-            class="shrink-0 w-20 md:w-24 p-3 flex items-start justify-center column-rule"
-          >
-            <div class="w-14 h-14 md:w-18 md:h-18 border overflow-hidden" :style="{ borderColor:'rgba(90,79,64,0.4)', background:'rgba(74,64,53,0.3)' }">
-              <img
-                :src="store.userCharacter.avatarUrl"
-                :alt="store.userCharacter.name"
-                class="w-full h-full object-cover"
-                style="filter: sepia(0.4) contrast(0.85);"
-              />
-            </div>
-          </div>
-
           <!-- Prev arrow -->
           <button
             class="dialogue-nav-arrow shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
-            :class="isFirstLine ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
-            :disabled="isFirstLine"
-            @click.stop="!isFirstLine && prevLine()"
+            :class="isFirstBlock ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
+            :disabled="isFirstBlock"
+            @click.stop="!isFirstBlock && prevBlock()"
           >
             <i class="fa-solid fa-chevron-left" style="font-size:0.85rem; color:var(--vn-fg);" />
           </button>
 
           <!-- Text area -->
           <div class="flex-1 py-4 px-3 md:px-5 min-w-0">
-            <!-- Speaker name -->
-            <div v-if="currentLine.speaker" class="mb-2 flex items-center gap-2">
+            <!-- Character name -->
+            <div v-if="currentBlock.type === 'character' && currentBlock.character" class="mb-2 flex items-center gap-2">
               <span style="color:var(--rust); font-weight:bold; font-size:0.875rem; letter-spacing:0.1em;">
-                {{ currentLine.speaker }}
+                {{ currentBlock.character }}
               </span>
               <div class="flex-1" :style="{ height:'1px', background:'linear-gradient(to right, rgba(139,69,19,0.3), transparent)' }" />
             </div>
 
             <!-- Narration indicator -->
-            <div v-if="currentLine.isNarration && !currentLine.speaker" class="mb-2 flex items-center gap-2">
+            <div v-if="currentBlock.type === 'narration'" class="mb-2 flex items-center gap-2">
               <div style="width:8px; height:8px; background:rgba(139,69,19,0.4); transform:rotate(45deg);" />
               <div class="flex-1" :style="{ height:'1px', background:'linear-gradient(to right, rgba(212,197,160,0.1), transparent)' }" />
             </div>
@@ -60,8 +45,10 @@
               <p
                 class="text-sm md:text-base leading-relaxed tracking-wide"
                 :style="{
-                  color: currentLine.isNarration ? 'rgba(212,197,160,0.7)' : 'rgba(212,197,160,0.9)',
-                  fontStyle: currentLine.isNarration ? 'italic' : 'normal',
+                  color: getTextColor(),
+                  fontStyle: currentBlock.type === 'narration' ? 'italic' : 'normal',
+                  textAlign: currentBlock.type === 'blacktext' ? 'center' : currentBlock.type === 'user' ? 'right' : 'left',
+                  fontSize: currentBlock.type === 'blacktext' ? '1.5rem' : undefined,
                 }"
               >
                 {{ displayedText }}
@@ -77,21 +64,21 @@
           <!-- Next arrow -->
           <button
             class="dialogue-nav-arrow shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
-            :class="isLastLine || hasChoices ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
-            :disabled="isLastLine || hasChoices"
-            @click.stop="!isLastLine && !hasChoices && nextLine()"
+            :class="isLastBlock || hasChoices ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
+            :disabled="isLastBlock || hasChoices"
+            @click.stop="!isLastBlock && !hasChoices && nextBlock()"
           >
             <i class="fa-solid fa-chevron-right" style="font-size:0.85rem; color:var(--vn-fg);" />
           </button>
         </div>
 
-        <!-- Bottom decorative lines -->
-        <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
-        <div :style="{ height:'2px', marginTop:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.3), transparent)' }" />
+        <!-- Bottom decorative lines (hidden for blacktext) -->
+        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
+        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'2px', marginTop:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.3), transparent)' }" />
 
-        <!-- Line counter -->
+        <!-- Block counter -->
         <div class="absolute bottom-1 right-3" style="font-size:10px; color:var(--vn-muted); font-family:monospace; opacity:0.4;">
-          {{ currentLineIndex + 1 }}/{{ dialogueLines.length }}
+          {{ store.currentDialogueIndex + 1 }}/{{ store.currentMessageBlocks.length }}
         </div>
       </div>
     </div>
@@ -99,10 +86,9 @@
 </template>
 
 <script setup lang="ts">
-import { useVNStore, type DialogueLine } from './store';
+import { useVNStore } from './store';
 
 const props = defineProps<{
-  dialogueLines: DialogueLine[];
   choices: { choiceId: string; text: string; isCustomInput?: boolean }[];
   duringStreaming: boolean;
 }>();
@@ -111,49 +97,65 @@ const store = useVNStore();
 const textRef = ref<HTMLDivElement | null>(null);
 const isManualScroll = ref(false);
 
-const currentLineIndex = ref(0);
 const displayedText = ref('');
 const isTyping = ref(false);
 let typingTimer: ReturnType<typeof setTimeout> | null = null;
 
-const currentLine = computed(() => props.dialogueLines[currentLineIndex.value]);
-const isFirstLine = computed(() => currentLineIndex.value === 0);
-const isLastLine = computed(() => currentLineIndex.value === props.dialogueLines.length - 1);
+const currentBlock = computed(() => store.currentBlock);
+const isFirstBlock = computed(() => store.currentDialogueIndex === 0);
+const isLastBlock = computed(() => store.currentDialogueIndex === store.currentMessageBlocks.length - 1);
 const hasChoices = computed(() => props.choices.length > 0);
-const layoutMode = computed(() =>
-  store.userCharacter.showSprite && store.userCharacter.avatarUrl ? 'withAvatar' : 'normal',
-);
 
-function prevLine() {
-  if (currentLineIndex.value > 0) {
-    currentLineIndex.value--;
+function prevBlock() {
+  store.prevDialogue();
+}
+
+function nextBlock() {
+  store.nextDialogue();
+}
+
+function getTextColor() {
+  if (!currentBlock.value) return 'rgba(212,197,160,0.9)';
+  
+  switch (currentBlock.value.type) {
+    case 'blacktext':
+      return 'rgba(212,197,160,0.9)';
+    case 'narration':
+      return 'rgba(212,197,160,0.7)';
+    case 'user':
+      return 'rgba(160,197,212,0.95)';
+    case 'character':
+    default:
+      return 'rgba(212,197,160,0.9)';
   }
 }
-function nextLine() {
-  if (currentLineIndex.value < props.dialogueLines.length - 1) {
-    currentLineIndex.value++;
+
+function getBlockText() {
+  if (!currentBlock.value) return '';
+  
+  switch (currentBlock.value.type) {
+    case 'character':
+      return currentBlock.value.text || '';
+    case 'narration':
+    case 'blacktext':
+      return currentBlock.value.message || '';
+    case 'user':
+      return currentBlock.value.text || '';
+    default:
+      return '';
   }
 }
 
 watch(
-  () => props.dialogueLines.length,
-  (newLen) => {
-    if (props.duringStreaming && newLen > 0) {
-      currentLineIndex.value = newLen - 1;
-    }
-  },
-);
-
-watch(
-  currentLine,
-  (line) => {
-    if (!line) return;
+  currentBlock,
+  (block) => {
+    if (!block) return;
     if (typingTimer) clearTimeout(typingTimer);
 
     displayedText.value = '';
     isTyping.value = true;
 
-    const fullText = line.text;
+    const fullText = getBlockText();
     const charDelay = store.settings.textSpeed >= 10 ? 0 : Math.max(10, 120 - store.settings.textSpeed * 12);
     let charIndex = 0;
 
@@ -184,11 +186,11 @@ watch(displayedText, () => {
 });
 
 watch(
-  () => [store.settings.autoPlay, isTyping.value, hasChoices.value, isLastLine.value, currentLineIndex.value] as const,
+  () => [store.settings.autoPlay, isTyping.value, hasChoices.value, isLastBlock.value, store.currentDialogueIndex] as const,
   ([autoPlay, typing, choices, last]) => {
     if (!autoPlay || typing || choices || last) return;
     const delay = Math.max(500, 5000 - store.settings.autoPlaySpeed * 400);
-    const timer = setTimeout(nextLine, delay);
+    const timer = setTimeout(nextBlock, delay);
     onScopeDispose(() => clearTimeout(timer));
   },
 );
@@ -201,12 +203,10 @@ function handleTextScroll() {
 function handleClickText() {
   if (isTyping.value) {
     if (typingTimer) clearTimeout(typingTimer);
-    if (currentLine.value) {
-      displayedText.value = currentLine.value.text;
-      isTyping.value = false;
-    }
-  } else if (!hasChoices.value && !isLastLine.value) {
-    nextLine();
+    displayedText.value = getBlockText();
+    isTyping.value = false;
+  } else if (!hasChoices.value && !isLastBlock.value) {
+    nextBlock();
   }
 }
 

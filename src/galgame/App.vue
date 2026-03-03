@@ -6,13 +6,16 @@
   >
     <StageArea />
 
+    <!-- Image Deck (扇形卡牌队列) -->
+    <ImageDeck v-if="showImageDeck" />
+
     <div class="pointer-events-none absolute inset-0 flex flex-col" style="z-index: 20">
       <div class="pointer-events-auto">
         <QuickAccessMenu :is-fullscreen="isFullscreen" @toggle-fullscreen="toggleFullscreen" />
       </div>
       <div class="flex-1" />
       <div class="pointer-events-auto pb-6 md:pb-8">
-        <DialogueBox :dialogue-lines="dialogueLines" :choices="choices" :during-streaming="context.during_streaming" />
+        <DialogueBox :choices="choices" :during-streaming="context.during_streaming" />
       </div>
     </div>
 
@@ -21,8 +24,6 @@
     <SettingsPanel v-if="store.activeOverlay === 'settings'" />
     <HistoryPanel
       v-if="store.activeOverlay === 'history'"
-      :dialogue-lines="dialogueLines"
-      :current-line-index="dialogueLines.length - 1"
       @go-to-line="handleGoToLine"
     />
     <CharacterPanel v-if="store.activeOverlay === 'character'" />
@@ -56,14 +57,25 @@ import ChoicePanel from './ChoicePanel.vue';
 import DialogueBox from './DialogueBox.vue';
 import GameplayPanel from './GameplayPanel.vue';
 import HistoryPanel from './HistoryPanel.vue';
+import ImageDeck from './ImageDeck.vue';
 import QuickAccessMenu from './QuickAccessMenu.vue';
 import SettingsPanel from './SettingsPanel.vue';
 import StageArea from './StageArea.vue';
-import { parseChoices, parseDialogueLines, useVNStore } from './store';
+import { parseChoices, useVNStore } from './store';
 
 const context = injectStreamingMessageContext();
 const store = useVNStore();
 const mainEl = ref<HTMLElement | null>(null);
+
+// 显示扇形卡牌队列的条件：同时打开背景和CG生图开关
+const showImageDeck = computed(() => {
+  return (
+    store.settings.imageGenEnabled &&
+    store.settings.backgroundGenEnabled &&
+    store.settings.cgGenEnabled &&
+    store.imageCardQueue.length > 0
+  );
+});
 
 function getFullscreenDoc(): Document | null {
   if (document.fullscreenElement) return document;
@@ -77,10 +89,20 @@ function getFullscreenDoc(): Document | null {
 
 const isFullscreen = ref(!!getFullscreenDoc());
 
-const dialogueLines = computed(() => parseDialogueLines(context.message));
 const choices = computed(() => parseChoices(context.message));
 
 const toastAnim = ref<'in' | 'out' | 'hidden'>('hidden');
+
+// 监听消息变化，自动解析
+watch(
+  () => context.message,
+  async (newMessage) => {
+    if (newMessage) {
+      await store.parseCurrentMessage(newMessage);
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   () => [store.toastVisible, store.toastMessage] as const,

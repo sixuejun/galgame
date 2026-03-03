@@ -1,4 +1,7 @@
 import { klona } from 'klona';
+import type { MessageBlock } from './types/message';
+import { parseMessageBlocks } from './utils/messageParser';
+import { clearResourceCache } from './utils/worldbookLoader';
 
 // ====== Types ======
 
@@ -80,7 +83,7 @@ export interface RiddleRecord {
 }
 
 export type OverlayPanel = 'none' | 'settings' | 'history' | 'character' | 'gameplay';
-export type ProviderStatus = 'available' | 'degraded' | 'disabled';
+export type ProviderStatus = 'available' | 'disabled';
 
 export interface SystemPersonality {
   id: string;
@@ -97,30 +100,20 @@ export interface SystemChatMessage {
   text: string;
 }
 
-// ====== Summary System Types ======
-
-export interface SmallSummary {
-  id: string;
-  content: string;
-  rounds: string;
-  timestamp: number;
-}
-
-export interface BigSummary {
-  id: string;
-  content: string;
-  rounds: string;
-  timestamp: number;
-  smallCount: number;
-}
-
 export interface SecondApiGeneration {
   id: string;
-  type: 'danmaku' | 'summary' | 'imageTag' | 'variable';
+  type: 'danmaku' | 'imageTag' | 'variable';
   content: string;
   timestamp: number;
   messageId: number;
   inserted: boolean;
+}
+
+export interface ImageCard {
+  id: string;
+  imageData: string;
+  type: 'background' | 'cg';
+  timestamp: number;
 }
 
 // ====== Worldbook Enhancement Types ======
@@ -130,7 +123,9 @@ export interface WorldbookEntryEnhanced {
   enabled: boolean;
   targetApi: 'main' | 'second' | 'both';
   autoControl: boolean;
-  linkedFeature?: 'danmaku' | 'imageGen' | 'summary';
+  linkedFeature?: 'danmaku' | 'imageGen';
+  /** Source worldbook name - set by getEnhancedWorldbook */
+  _worldbookName?: string;
   // Original worldbook entry fields will be preserved
   [key: string]: any;
 }
@@ -152,9 +147,11 @@ const VNSettings = z
     danmakuLoop: z.boolean().default(false),
     danmakuDisplay: z.enum(['full', 'half', 'third']).default('third'),
     danmakuSendChatHistory: z.boolean().default(false),
+    danmakuChatHistoryDepth: z.number().min(1).max(500).default(10),
     secondApiUrl: z.string().default(''),
     secondApiKey: z.string().default(''),
     secondApiModel: z.string().default(''),
+    secondApiPreset: z.string().default(''),
     secondApiStream: z.boolean().default(false),
     secondApiTemperature: z.union([z.number(), z.literal('unset')]).default('unset'),
     secondApiMaxTokens: z.union([z.number(), z.literal('unset')]).default('unset'),
@@ -165,20 +162,16 @@ const VNSettings = z
     imageGenEnabled: z.boolean().default(false),
     backgroundGenEnabled: z.boolean().default(false),
     cgGenEnabled: z.boolean().default(false),
-    // Summary system config
-    summarySmallInterval: z.number().min(1).max(50).default(5),
-    summaryBigThreshold: z.number().min(2).max(20).default(6),
-    summaryAutoEnabled: z.boolean().default(true),
-    summaryApiType: z.enum(['main', 'second']).default('second'),
+    imageGenPriority: z.enum(['cg', 'background']).default('cg'),
     // API task config
     apiTaskDanmaku: z.enum(['main', 'second', 'disabled']).default('second'),
-    apiTaskSummary: z.enum(['main', 'second', 'disabled']).default('second'),
     apiTaskImageTag: z.enum(['main', 'second', 'disabled']).default('second'),
     apiTaskVariable: z.enum(['main', 'second', 'disabled']).default('main'),
   })
   .prefault({});
 
 const SECOND_API_TIMEOUT_MS = 30000;
+const SECOND_API_RETRY_COUNT = 2;
 
 // 生图：通过前端助手事件与外部插件通信，无需自配 API
 export const ImageGenEventType = {
@@ -201,8 +194,6 @@ export type ImageGenResponseData = {
   prompt?: string;
   change?: string;
 };
-const SECOND_API_RETRY_COUNT = 2;
-const SECOND_API_DEGRADED_THRESHOLD = 3;
 
 type DanmakuPayload = {
   contentText: string;
@@ -211,10 +202,9 @@ type DanmakuPayload = {
 type ShopPayload = { systemPrompt: string };
 type SystemPayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
 type RiddlePayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
-type SummaryPayload = { systemPrompt: string };
 type ImageTagPayload = { systemPrompt: string };
 
-type SecondApiPayload = DanmakuPayload | ShopPayload | SystemPayload | RiddlePayload | SummaryPayload | ImageTagPayload;
+type SecondApiPayload = DanmakuPayload | ShopPayload | SystemPayload | RiddlePayload | ImageTagPayload;
 
 const VNGameData = z
   .object({
@@ -332,6 +322,14 @@ const DEMO_MODULES: GameModule[] = [
     displayName: '情报交换',
     description: '与 AI 对话猜谜获取情报',
     icon: 'fa-comments',
+    openMode: 'overlay',
+    closeBehavior: 'returnHub',
+  },
+  {
+    moduleId: 'board_game',
+    displayName: '废土行路',
+    description: '掷骰走格子，在末日废墟中行路探险',
+    icon: 'fa-dice-d6',
     openMode: 'overlay',
     closeBehavior: 'returnHub',
   },
@@ -676,43 +674,85 @@ export const useVNStore = defineStore('vn', () => {
     const on = settings.value.imageGenEnabled;
     const bg = on && settings.value.backgroundGenEnabled;
     const cg = on && settings.value.cgGenEnabled;
-    insertOrAssignVariables(
-      { vn_bg_gen_enabled: bg, vn_cg_gen_enabled: cg },
-      { type: 'chat' },
-    );
+    insertOrAssignVariables({ vn_bg_gen_enabled: bg, vn_cg_gen_enabled: cg }, { type: 'chat' });
   });
 
   const systemChatOpen = ref(false);
   const activePersonalityId = ref<string | null>(null);
 
-  // --- Summary System ---
-  const _rawSummaryData = getVariables({ type: 'chat' });
-  const summaryData = ref<{
-    small: SmallSummary[];
-    big: BigSummary[];
-    currentRound: number;
-  }>({
-    small: Array.isArray(_rawSummaryData?.vn_summary_small) ? _rawSummaryData.vn_summary_small : [],
-    big: Array.isArray(_rawSummaryData?.vn_summary_big) ? _rawSummaryData.vn_summary_big : [],
-    currentRound: typeof _rawSummaryData?.vn_summary_current_round === 'number' ? _rawSummaryData.vn_summary_current_round : 0,
-  });
+  // --- Last system prompt debug (for inspection) ---
+  const lastSystemPrompts = ref<{ role: string; content: string }[]>([]);
 
   // --- Second API Generations Tracking ---
+  const _rawGenVars = getVariables({ type: 'chat' });
   const secondApiGenerations = ref<SecondApiGeneration[]>(
-    Array.isArray(_rawSummaryData?.vn_second_api_generations) ? _rawSummaryData.vn_second_api_generations : [],
+    Array.isArray(_rawGenVars?.vn_second_api_generations) ? _rawGenVars.vn_second_api_generations : [],
   );
 
-  // Persist summary data and second API generations
   watchEffect(() => {
     insertOrAssignVariables(
       {
-        vn_summary_small: klona(summaryData.value.small),
-        vn_summary_big: klona(summaryData.value.big),
-        vn_summary_current_round: summaryData.value.currentRound,
         vn_second_api_generations: klona(secondApiGenerations.value),
       },
       { type: 'chat' },
     );
+  });
+
+  // --- Message Parsing ---
+  const currentMessageBlocks = ref<MessageBlock[]>([]);
+  const currentScene = ref<string>('');
+  const currentDialogueIndex = ref(0);
+
+  // Parse current message and update blocks
+  async function parseCurrentMessage(message: string) {
+    try {
+      console.info('[消息解析] 开始解析消息');
+      const blocks = await parseMessageBlocks(message, currentScene.value);
+
+      currentMessageBlocks.value = blocks;
+      currentDialogueIndex.value = 0;
+
+      // 更新当前场景（从最后一个块中获取）
+      for (let i = blocks.length - 1; i >= 0; i--) {
+        if (blocks[i].scene) {
+          currentScene.value = blocks[i].scene!;
+          break;
+        }
+      }
+
+      console.info('[消息解析] 解析完成，共', blocks.length, '个块');
+      console.info('[消息解析] 当前场景:', currentScene.value);
+    } catch (error) {
+      console.error('[消息解析] 解析失败:', error);
+      currentMessageBlocks.value = [];
+    }
+  }
+
+  // Navigate dialogue
+  function nextDialogue() {
+    if (currentDialogueIndex.value < currentMessageBlocks.value.length - 1) {
+      currentDialogueIndex.value++;
+    }
+  }
+
+  function prevDialogue() {
+    if (currentDialogueIndex.value > 0) {
+      currentDialogueIndex.value--;
+    }
+  }
+
+  // Get current dialogue block
+  const currentBlock = computed(() => {
+    return currentMessageBlocks.value[currentDialogueIndex.value] || null;
+  });
+
+  // Clear worldbook cache when chat changes
+  eventOn(tavern_events.CHAT_CHANGED, () => {
+    clearResourceCache();
+    currentScene.value = '';
+    currentMessageBlocks.value = [];
+    currentDialogueIndex.value = 0;
+    console.info('[消息解析] 聊天切换，已清除缓存和状态');
   });
 
   // --- Derived ---
@@ -722,19 +762,98 @@ export const useVNStore = defineStore('vn', () => {
   const workshopLevel = computed(() => gameData.value.workshopLevel);
 
   // --- API Provider status (available | degraded | disabled) ---
-  const secondApiConsecutiveFailures = ref(0);
-  const secondApiStatusOverride = ref<ProviderStatus | null>(null);
-  const secondApiLastErrorType = ref<'timeout' | '4xx' | '5xx' | 'parse' | 'model_fetch' | null>(null);
   const secondApiStatus = computed<ProviderStatus>(() => {
-    if (secondApiStatusOverride.value === 'degraded') return 'degraded';
     if (!settings.value.secondApiUrl || !settings.value.secondApiKey) return 'disabled';
-    if (secondApiStatusOverride.value === 'available') return 'available';
-    if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD) return 'degraded';
     return 'available';
   });
   const imageApiStatus = computed<ProviderStatus>(() =>
     settings.value.imageApiUrl && settings.value.imageApiKey ? 'available' : 'disabled',
   );
+
+  // --- Second API Model List ---
+  const secondApiModelList = ref<string[]>([]);
+  const secondApiModelListLoading = ref(false);
+
+  async function fetchSecondApiModelList(): Promise<void> {
+    const url = settings.value.secondApiUrl?.trim();
+    const key = settings.value.secondApiKey?.trim();
+
+    if (!url || !key) {
+      showToast('第二 API 未配置');
+      return;
+    }
+
+    secondApiModelListLoading.value = true;
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+
+      const res = await fetch(`${url.replace(/\/$/, '')}/models`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${key}`,
+        },
+        signal: ctrl.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        showToast(`获取模型列表失败：${res.status} ${text}`);
+        setSecondApiDegraded('model_fetch');
+        return;
+      }
+
+      const body = await res.json();
+      secondApiModelList.value = (body.data || []).map((m: any) => m.id).sort();
+      showToast(`共获取 ${secondApiModelList.value.length} 个模型`);
+      clearSecondApiDegraded();
+    } catch (e: any) {
+      showToast(`获取模型列表失败：${e.message || '网络错误'}`);
+      setSecondApiDegraded('model_fetch');
+    } finally {
+      secondApiModelListLoading.value = false;
+    }
+  }
+
+  async function testSecondApiConnection(): Promise<boolean> {
+    const url = settings.value.secondApiUrl?.trim();
+    const key = settings.value.secondApiKey?.trim();
+
+    if (!url || !key) {
+      showToast('请先填写接口地址与 API 密钥');
+      return false;
+    }
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+
+      const res = await fetch(`${url.replace(/\/$/, '')}/models`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${key}`,
+        },
+        signal: ctrl.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (res.ok) {
+        showToast('连接成功，密钥可用 ✓');
+        return true;
+      } else {
+        const text = await res.text().catch(() => res.statusText);
+        showToast(`连接失败：${res.status} ${text}`);
+        return false;
+      }
+    } catch (e: any) {
+      showToast(`网络错误：${e.message || '无法到达服务器'}`);
+      return false;
+    }
+  }
 
   // --- 生图（事件通信）---
   const stageBackgroundImage = ref<string | null>(null);
@@ -742,12 +861,29 @@ export const useVNStore = defineStore('vn', () => {
   const pendingImageRequests = new Map<string, { type: 'background' | 'cg' }>();
   let imageGenListenerStopped: (() => void) | null = null;
 
+  // 图片卡牌队列（最多10张）
+  const imageCardQueue = ref<ImageCard[]>([]);
+  const MAX_IMAGE_CARDS = 10;
+
   function handleImageResponse(responseData: ImageGenResponseData) {
     if (!responseData || !responseData.id) return;
     const pending = pendingImageRequests.get(responseData.id);
     if (!pending) return;
     pendingImageRequests.delete(responseData.id);
     if (responseData.success && responseData.imageData) {
+      // 添加到卡牌队列
+      const card: ImageCard = {
+        id: responseData.id,
+        imageData: responseData.imageData,
+        type: pending.type,
+        timestamp: Date.now(),
+      };
+      imageCardQueue.value.push(card);
+      if (imageCardQueue.value.length > MAX_IMAGE_CARDS) {
+        imageCardQueue.value.shift();
+      }
+
+      // 同时更新舞台显示
       if (pending.type === 'background') stageBackgroundImage.value = responseData.imageData;
       else stageCgImage.value = responseData.imageData;
     }
@@ -782,6 +918,19 @@ export const useVNStore = defineStore('vn', () => {
     requestImage(prompt, 'cg');
   }
 
+  // 切换卡牌显示到舞台
+  function switchToImageCard(cardId: string) {
+    const card = imageCardQueue.value.find(c => c.id === cardId);
+    if (!card) return;
+    if (card.type === 'background') stageBackgroundImage.value = card.imageData;
+    else stageCgImage.value = card.imageData;
+  }
+
+  // 清空卡牌队列
+  function clearImageCardQueue() {
+    imageCardQueue.value = [];
+  }
+
   // --- Module locking ---
   function getModuleLockReason(moduleId: string): string | undefined {
     if (moduleId === 'shop' && secondApiStatus.value === 'disabled') return '需要配置第二 API';
@@ -793,7 +942,7 @@ export const useVNStore = defineStore('vn', () => {
 
   // --- Second API unified entry ---
   async function callSecondApi(
-    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'summary' | 'imageTag',
+    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'imageTag',
     payload: SecondApiPayload,
   ): Promise<string[] | ShopItem[] | string> {
     const url = settings.value.secondApiUrl?.trim();
@@ -803,6 +952,22 @@ export const useVNStore = defineStore('vn', () => {
       return task === 'shop' ? [] : task === 'danmaku' ? [] : '';
     }
     const model = settings.value.secondApiModel?.trim() || 'gpt-3.5-turbo';
+    
+    // 如果设置了预设，先加载预设
+    const presetName = settings.value.secondApiPreset?.trim();
+    let currentPreset: string | null = null;
+    if (presetName) {
+      try {
+        // 保存当前预设
+        currentPreset = getLoadedPresetName();
+        // 加载指定预设
+        await loadPreset(presetName);
+        console.info(`[SecondAPI] 已加载预设: ${presetName}`);
+      } catch (e) {
+        console.warn(`[SecondAPI] 加载预设失败: ${presetName}`, e);
+      }
+    }
+
     const custom_api = {
       apiurl: url,
       key,
@@ -823,8 +988,8 @@ export const useVNStore = defineStore('vn', () => {
           ]
         : task === 'shop'
           ? [{ role: 'user', content: (payload as ShopPayload).systemPrompt }]
-          : task === 'summary' || task === 'imageTag'
-            ? [{ role: 'user', content: (payload as SummaryPayload | ImageTagPayload).systemPrompt }]
+          : task === 'imageTag'
+            ? [{ role: 'user', content: (payload as ImageTagPayload).systemPrompt }]
             : (payload as SystemPayload | RiddlePayload).ordered_prompts;
 
     const doRequest = (): Promise<string> =>
@@ -838,11 +1003,12 @@ export const useVNStore = defineStore('vn', () => {
         ),
       ]);
 
-    for (let attempt = 0; attempt <= SECOND_API_RETRY_COUNT; attempt++) {
-      try {
-        const raw = await doRequest();
-        secondApiConsecutiveFailures.value = 0;
-        secondApiStatusOverride.value = 'available';
+    try {
+      for (let attempt = 0; attempt <= SECOND_API_RETRY_COUNT; attempt++) {
+        try {
+          const raw = await doRequest();
+          secondApiConsecutiveFailures.value = 0;
+          secondApiStatusOverride.value = 'available';
         if (task === 'danmaku') {
           const lines = raw
             .split(/\n/)
@@ -878,27 +1044,35 @@ export const useVNStore = defineStore('vn', () => {
           }
           return items;
         }
-        return raw;
-      } catch {
-        secondApiConsecutiveFailures.value++;
-        if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD)
-          secondApiStatusOverride.value = 'degraded';
+          return raw;
+        } catch {
+          secondApiConsecutiveFailures.value++;
+          if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD)
+            secondApiStatusOverride.value = 'degraded';
+        }
+      }
+      showToast(task === 'shop' ? '商店解析失败' : '请求失败');
+      if (task === 'shop') return [];
+      return '';
+    } finally {
+      // 恢复原预设
+      if (currentPreset && presetName) {
+        try {
+          await loadPreset(currentPreset);
+          console.info(`[SecondAPI] 已恢复预设: ${currentPreset}`);
+        } catch (e) {
+          console.warn(`[SecondAPI] 恢复预设失败: ${currentPreset}`, e);
+        }
       }
     }
-    showToast(task === 'shop' ? '商店解析失败' : '请求失败');
-    if (task === 'shop') return [];
-    return '';
   }
 
   function setSecondApiDegraded(reason: 'model_fetch' | 'timeout') {
-    secondApiStatusOverride.value = 'degraded';
-    secondApiLastErrorType.value = reason;
+    console.warn('[SecondAPI] Degraded:', reason);
   }
 
   function clearSecondApiDegraded() {
-    secondApiStatusOverride.value = 'available';
-    secondApiConsecutiveFailures.value = 0;
-    secondApiLastErrorType.value = null;
+    console.info('[SecondAPI] Cleared degraded status');
   }
 
   /** Called from index.ts on GENERATION_ENDED; runs danmaku request and queues push with 200ms–3s spacing */
@@ -911,7 +1085,9 @@ export const useVNStore = defineStore('vn', () => {
     if (!contentText) return;
     let chatHistory: { role: 'system' | 'assistant' | 'user'; content: string }[] | undefined;
     if (settings.value.danmakuSendChatHistory && message_id > 0) {
-      const prev = getChatMessages(`0-${message_id - 1}`);
+      const depth = settings.value.danmakuChatHistoryDepth;
+      const startId = Math.max(0, message_id - depth);
+      const prev = getChatMessages(`${startId}-${message_id - 1}`);
       chatHistory = prev.flatMap(m => {
         const role = m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user';
         const text = (m.message ?? '').replace(/<content>[\s\S]*?<\/content>/g, '').trim();
@@ -932,40 +1108,37 @@ export const useVNStore = defineStore('vn', () => {
     }
   }
 
-  // ====== Summary System ======
-
   /** Unified API task executor - routes to main or second API based on config */
   async function callApiForTask(
-    task: 'danmaku' | 'summary' | 'imageTag' | 'variable',
+    task: 'danmaku' | 'imageTag' | 'variable',
     prompt: string,
   ): Promise<string> {
     let apiType: 'main' | 'second' | 'disabled' = 'disabled';
-    
+
     if (task === 'danmaku') apiType = settings.value.apiTaskDanmaku;
-    else if (task === 'summary') apiType = settings.value.apiTaskSummary;
     else if (task === 'imageTag') apiType = settings.value.apiTaskImageTag;
     else if (task === 'variable') apiType = settings.value.apiTaskVariable;
-    
+
     if (apiType === 'disabled') return '';
-    
+
     if (apiType === 'second') {
       return await callSecondApiWithTracking(task, { systemPrompt: prompt });
     } else {
       // Use main API - note: generate() is not available in store context
       // For now, we'll just use second API or return empty
-      console.warn('[Summary] Main API not implemented for task:', task);
+      console.warn('[API] Main API not implemented for task:', task);
       return '';
     }
   }
 
   /** Wrapper for callSecondApi that tracks generations and inserts to message */
   async function callSecondApiWithTracking(
-    task: 'danmaku' | 'summary' | 'imageTag' | 'variable',
+    task: 'danmaku' | 'imageTag' | 'variable',
     payload: { systemPrompt: string },
   ): Promise<string> {
     const result = await callSecondApi(task, payload);
     const content = typeof result === 'string' ? result : JSON.stringify(result);
-    
+
     // Record generation
     const generation: SecondApiGeneration = {
       id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -975,20 +1148,20 @@ export const useVNStore = defineStore('vn', () => {
       messageId: -1,
       inserted: false,
     };
-    
+
     secondApiGenerations.value.push(generation);
-    
+
     // Keep only last 50 generations
     if (secondApiGenerations.value.length > 50) {
       secondApiGenerations.value = secondApiGenerations.value.slice(-50);
     }
-    
+
     // Insert to latest message
     await insertGenerationToMessage(generation);
-    
+
     // Toast notification
     showToast(`第二API已生成${task}内容`);
-    
+
     return content;
   }
 
@@ -996,228 +1169,140 @@ export const useVNStore = defineStore('vn', () => {
   async function insertGenerationToMessage(gen: SecondApiGeneration) {
     const messages = getChatMessages('latest');
     const lastMessage = messages[messages.length - 1];
-    
+
     if (!lastMessage) return;
-    
+
     const marker = `\n<!-- 第二API生成(${gen.type}): ${gen.content} -->`;
     const updatedMessage = lastMessage.message + marker;
-    
+
     await setChatMessages([{ ...lastMessage, message: updatedMessage }], lastMessage.id);
-    
+
     gen.messageId = lastMessage.id;
     gen.inserted = true;
   }
 
-  /** Generate small summary from recent messages */
-  async function generateSmallSummary() {
-    const interval = settings.value.summarySmallInterval;
-    const startRound = summaryData.value.currentRound - interval + 1;
-    const endRound = summaryData.value.currentRound;
-    
-    // Get recent N messages
-    const recentMessages = getChatMessages(`-${interval}-latest`);
-    const content = recentMessages.map(m => m.message).join('\n\n');
-    
-    const prompt = `请简要总结以下${interval}轮对话的关键信息（200字以内）：\n\n${content}`;
-    
-    try {
-      const summary = await callApiForTask('summary', prompt);
-      
-      if (!summary) return;
-      
-      summaryData.value.small.push({
-        id: `small-${Date.now()}`,
-        content: summary,
-        rounds: `${startRound}-${endRound}`,
-        timestamp: Date.now(),
-      });
-      
-      showToast(`已生成第 ${summaryData.value.small.length} 个小总结`);
-    } catch (e) {
-      console.error('[Summary] Failed to generate small summary:', e);
-      showToast('小总结生成失败');
-    }
-  }
-
-  /** Generate big summary from accumulated small summaries */
-  async function generateBigSummary() {
-    const smallSummaries = summaryData.value.small;
-    
-    if (smallSummaries.length === 0) return;
-    
-    const firstRound = parseInt(smallSummaries[0].rounds.split('-')[0]);
-    const lastRound = summaryData.value.currentRound;
-    
-    const content = smallSummaries.map((s, i) => `[${i + 1}] ${s.content}`).join('\n\n');
-    
-    const prompt = `请将以下${smallSummaries.length}个小总结提炼为一个关键的长期记忆（300字以内）：\n\n${content}`;
-    
-    try {
-      const bigSummary = await callApiForTask('summary', prompt);
-      
-      if (!bigSummary) return;
-      
-      summaryData.value.big.push({
-        id: `big-${Date.now()}`,
-        content: bigSummary,
-        rounds: `${firstRound}-${lastRound}`,
-        timestamp: Date.now(),
-        smallCount: smallSummaries.length,
-      });
-      
-      // Clear small summaries
-      summaryData.value.small = [];
-      
-      // Keep only last 10 big summaries
-      if (summaryData.value.big.length > 10) {
-        summaryData.value.big = summaryData.value.big.slice(-10);
-      }
-      
-      showToast(`已生成大总结（包含 ${smallSummaries.length} 个小总结）`);
-    } catch (e) {
-      console.error('[Summary] Failed to generate big summary:', e);
-      showToast('大总结生成失败');
-    }
-  }
-
-  /** Called from index.ts on GENERATION_ENDED; checks and triggers summaries */
-  async function onMessageGenerated(message_id: number) {
-    if (!settings.value.summaryAutoEnabled) return;
-    
-    summaryData.value.currentRound++;
-    
-    console.info(`[Summary] Round ${summaryData.value.currentRound}, message ${message_id}`);
-    
-    // Check if need small summary
-    if (summaryData.value.currentRound % settings.value.summarySmallInterval === 0) {
-      console.info(`[Summary] Triggering small summary at round ${summaryData.value.currentRound}`);
-      await generateSmallSummary();
-    }
-    
-    // Check if need big summary
-    if (summaryData.value.small.length >= settings.value.summaryBigThreshold) {
-      console.info(`[Summary] Triggering big summary (${summaryData.value.small.length} small summaries)`);
-      await generateBigSummary();
-    }
-  }
-
-  /** Manually trigger big summary */
-  async function manualTriggerBigSummary() {
-    if (summaryData.value.small.length === 0) {
-      showToast('没有小总结可以生成大总结');
-      return;
-    }
-    
-    await generateBigSummary();
-  }
-
-  /** Edit summary content */
-  function editSummary(type: 'small' | 'big', id: string, newContent: string) {
-    const list = type === 'small' ? summaryData.value.small : summaryData.value.big;
-    const summary = list.find(s => s.id === id);
-    if (summary) {
-      summary.content = newContent;
-      showToast('总结已更新');
-    }
-  }
-
-  /** Delete summary */
-  function deleteSummary(type: 'small' | 'big', id: string) {
-    if (type === 'small') {
-      summaryData.value.small = summaryData.value.small.filter(s => s.id !== id);
-    } else {
-      summaryData.value.big = summaryData.value.big.filter(s => s.id !== id);
-    }
-    showToast('总结已删除');
-  }
-
   // ====== Worldbook Management ======
 
-  /** Get enhanced worldbook with our custom fields */
-  function getEnhancedWorldbook(): WorldbookEntryEnhanced[] {
-    const wb = getWorldbook();
-    if (!wb || !wb.entries) return [];
-    
-    return wb.entries.map(entry => ({
-      ...entry,
-      enabled: entry.enabled ?? true,
-      targetApi: entry.targetApi ?? 'main',
-      autoControl: entry.autoControl ?? false,
-      linkedFeature: entry.linkedFeature,
-    }));
+  /** Get all worldbook names associated with current character and chat */
+  function getAllCurrentWorldbookNames(): string[] {
+    const names: string[] = [];
+    try {
+      const charWbs = getCharWorldbookNames('current');
+      if (charWbs.primary) names.push(charWbs.primary);
+      names.push(...charWbs.additional);
+    } catch {}
+    try {
+      const chatWbName = getChatWorldbookName('current');
+      if (chatWbName && !names.includes(chatWbName)) names.push(chatWbName);
+    } catch {}
+    try {
+      for (const n of getGlobalWorldbookNames()) {
+        if (!names.includes(n)) names.push(n);
+      }
+    } catch {}
+    return names;
+  }
+
+  /** Get enhanced worldbook entries with our custom fields */
+  async function getEnhancedWorldbook(): Promise<WorldbookEntryEnhanced[]> {
+    const names = getAllCurrentWorldbookNames();
+    const allEntries: WorldbookEntryEnhanced[] = [];
+    for (const name of names) {
+      try {
+        const entries = await getWorldbook(name);
+        for (const entry of entries) {
+          allEntries.push({
+            ...entry,
+            enabled: entry.enabled,
+            targetApi: (entry.extra?.targetApi as 'main' | 'second' | 'both') ?? 'main',
+            autoControl: entry.extra?.autoControl ?? false,
+            linkedFeature: entry.extra?.linkedFeature,
+            _worldbookName: name,
+          });
+        }
+      } catch (e) {
+        console.warn(`[Worldbook] Failed to load worldbook "${name}":`, e);
+      }
+    }
+    return allEntries;
   }
 
   /** Update worldbook entry enhancement fields */
-  function updateWorldbookEntry(uid: number, updates: Partial<WorldbookEntryEnhanced>) {
-    const wb = getWorldbook();
-    if (!wb || !wb.entries) return;
-    
-    const entry = wb.entries.find(e => e.uid === uid);
-    if (entry) {
-      Object.assign(entry, updates);
-      replaceWorldbook(wb);
+  async function updateWorldbookEntry(uid: number, worldbookName: string, updates: Partial<WorldbookEntryEnhanced>) {
+    const { targetApi, autoControl, linkedFeature, enabled } = updates;
+    try {
+      await updateWorldbookWith(
+        worldbookName,
+        wb =>
+          wb.map(e => {
+            if (e.uid !== uid) return e;
+            const extra = { ...e.extra };
+            if (targetApi !== undefined) extra.targetApi = targetApi;
+            if (autoControl !== undefined) extra.autoControl = autoControl;
+            if (linkedFeature !== undefined) extra.linkedFeature = linkedFeature;
+            const result: any = { ...e, extra };
+            if (enabled !== undefined) result.enabled = enabled;
+            return result;
+          }),
+        { render: 'debounced' },
+      );
       showToast('世界书条目已更新');
+    } catch (e) {
+      console.error('[Worldbook] Failed to update entry:', e);
+      showToast('更新失败');
     }
   }
 
   /** Auto-control worldbook entries based on feature toggles */
-  function updateWorldbookAutoControl() {
-    const wb = getWorldbook();
-    if (!wb || !wb.entries) return;
-    
-    let updated = false;
-    
-    wb.entries.forEach(entry => {
-      if (!entry.autoControl) return;
-      
-      let shouldEnable = false;
-      
-      switch (entry.linkedFeature) {
-        case 'danmaku':
-          shouldEnable = settings.value.danmakuEnabled;
-          break;
-        case 'imageGen':
-          shouldEnable = settings.value.imageGenEnabled;
-          break;
-        case 'summary':
-          shouldEnable = settings.value.summaryAutoEnabled;
-          break;
+  async function updateWorldbookAutoControl() {
+    const names = getAllCurrentWorldbookNames();
+    for (const name of names) {
+      try {
+        const entries = await getWorldbook(name);
+        const hasAutoControl = entries.some(e => e.extra?.autoControl);
+        if (!hasAutoControl) continue;
+        let hasChange = false;
+        await updateWorldbookWith(
+          name,
+          wb =>
+            wb.map(e => {
+              if (!e.extra?.autoControl) return e;
+              let shouldEnable = false;
+              switch (e.extra?.linkedFeature) {
+                case 'danmaku':
+                  shouldEnable = settings.value.danmakuEnabled;
+                  break;
+                case 'imageGen':
+                  shouldEnable = settings.value.imageGenEnabled;
+                  break;
+              }
+              if (e.enabled !== shouldEnable) {
+                hasChange = true;
+                return { ...e, enabled: shouldEnable };
+              }
+              return e;
+            }),
+          { render: 'debounced' },
+        );
+        if (hasChange) {
+          console.info('[Worldbook] Auto-control updated entries in', name);
+        }
+      } catch (e) {
+        console.warn(`[Worldbook] Failed to update auto-control for "${name}":`, e);
       }
-      
-      if (entry.enabled !== shouldEnable) {
-        entry.enabled = shouldEnable;
-        updated = true;
-      }
-    });
-    
-    if (updated) {
-      replaceWorldbook(wb);
-      console.info('[Worldbook] Auto-control updated entries based on feature toggles');
     }
   }
 
-  /** Filter worldbook entries for API request based on targetApi */
-  function filterWorldbookForApi(apiType: 'main' | 'second'): typeof getWorldbook extends () => infer R ? R : never {
-    const wb = getWorldbook();
-    if (!wb || !wb.entries) return wb;
-    
-    const filtered = {
-      ...wb,
-      entries: wb.entries.filter(entry => {
-        if (!entry.enabled) return false;
-        const target = entry.targetApi ?? 'main';
-        return target === apiType || target === 'both';
-      }),
-    };
-    
-    return filtered;
+  /** @deprecated No-op: worldbook API filtering is now handled per-entry in the worldbook manager */
+  function filterWorldbookForApi(_apiType: 'main' | 'second') {
+    return null;
   }
 
   // Watch feature toggles and update worldbook auto-control
   watch(
-    () => [settings.value.danmakuEnabled, settings.value.imageGenEnabled, settings.value.summaryAutoEnabled],
-    () => {
-      updateWorldbookAutoControl();
+    () => [settings.value.danmakuEnabled, settings.value.imageGenEnabled],
+    async () => {
+      await updateWorldbookAutoControl();
     },
   );
 
@@ -1675,7 +1760,11 @@ export const useVNStore = defineStore('vn', () => {
     unreadPersonalityIds.value.delete(id);
   }
 
-  async function sendSystemUserMessage(personalityId: string, userText: string): Promise<string> {
+  async function sendSystemUserMessage(
+    personalityId: string,
+    userText: string,
+    options?: { context?: string },
+  ): Promise<string> {
     if (!unlockedPersonalityIds.value.has(personalityId)) {
       showToast('请先解锁该联系人');
       return '';
@@ -1685,10 +1774,24 @@ export const useVNStore = defineStore('vn', () => {
     hist.push({ role: 'user', text: userText });
     const personality = SYSTEM_PERSONALITIES.find(p => p.id === personalityId);
     const systemPrompt = personality?.systemPrompt ?? '你是一个助手。';
+
+    // Build ordered_prompts: System -> History -> Context -> User Input
+    const historyPrompts = hist
+      .slice(0, -1) // exclude the user message we just pushed (will be added at end)
+      .map(m => ({ role: m.role === 'proactive' ? 'assistant' : m.role, content: m.text }));
+    const contextPrompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = options?.context
+      ? [
+          { role: 'user', content: `[剧情参考]\n${options.context}` },
+          { role: 'assistant', content: '好的，我已了解相关剧情内容。' },
+        ]
+      : [];
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
       { role: 'system', content: systemPrompt },
-      ...hist.map(m => ({ role: m.role === 'proactive' ? 'assistant' : m.role, content: m.text })),
+      ...historyPrompts,
+      ...contextPrompts,
+      { role: 'user', content: userText },
     ];
+    lastSystemPrompts.value = ordered_prompts;
     try {
       const reply = (await callSecondApi('system', { ordered_prompts })) as string;
       hist.push({ role: 'assistant', text: reply || '(无回复)' });
@@ -1787,22 +1890,36 @@ export const useVNStore = defineStore('vn', () => {
     clearTransactionLog,
     addInventoryItem,
     secondApiStatus,
-    secondApiLastErrorType,
+    secondApiModelList,
+    secondApiModelListLoading,
+    fetchSecondApiModelList,
+    testSecondApiConnection,
     setSecondApiDegraded,
     clearSecondApiDegraded,
     callSecondApi,
     triggerDanmakuForMessage,
-    onMessageGenerated,
     imageApiStatus,
     stageBackgroundImage,
     stageCgImage,
+    imageCardQueue,
     setupImageGenListener,
     requestBackgroundImage,
     requestCgImage,
+    switchToImageCard,
+    clearImageCardQueue,
     getModuleLockReason,
     userCharacter,
     characterRoster,
     gameModules,
+    // Message parsing
+    currentMessageBlocks,
+    currentScene,
+    currentDialogueIndex,
+    currentBlock,
+    parseCurrentMessage,
+    nextDialogue,
+    prevDialogue,
+    // Workshop & Stock
     workshopProducing,
     workshopCharacterId,
     workshopStartTime,
@@ -1869,6 +1986,7 @@ export const useVNStore = defineStore('vn', () => {
     lastActiveUnlockedPersonalityId,
     selectSystemPersonality,
     sendSystemUserMessage,
+    lastSystemPrompts,
     addProactiveToSystemChat,
     triggerProactive,
     setOverlay,
@@ -1880,13 +1998,6 @@ export const useVNStore = defineStore('vn', () => {
     updateSettings,
     updateUserCharacter,
     showToast,
-    // Summary system
-    summaryData,
-    generateSmallSummary,
-    generateBigSummary,
-    manualTriggerBigSummary,
-    editSummary,
-    deleteSummary,
     // Second API generations
     secondApiGenerations,
     // Worldbook management
@@ -1894,30 +2005,5 @@ export const useVNStore = defineStore('vn', () => {
     updateWorldbookEntry,
     updateWorldbookAutoControl,
     filterWorldbookForApi,
-  };
-    purchaseShopItem,
-    danmakuItems,
-    pushDanmaku,
-    removeDanmaku,
-    SYSTEM_PERSONALITIES,
-    systemChatOpen,
-    activePersonalityId,
-    systemChatHistories,
-    unlockedPersonalityIds,
-    unreadPersonalityIds,
-    lastActiveUnlockedPersonalityId,
-    selectSystemPersonality,
-    sendSystemUserMessage,
-    addProactiveToSystemChat,
-    triggerProactive,
-    setOverlay,
-    toggleLeftMenu,
-    toggleRightMenu,
-    selectChoice,
-    lockChoice,
-    clearChoices,
-    updateSettings,
-    updateUserCharacter,
-    showToast,
   };
 });

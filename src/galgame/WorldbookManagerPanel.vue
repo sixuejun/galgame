@@ -14,9 +14,43 @@
           </div>
           <h2 class="text-lg font-bold tracking-widest" style="color:rgba(212,197,160,0.9);">世界书管理</h2>
         </div>
-        <button class="w-8 h-8 flex items-center justify-center cursor-pointer" style="color:var(--vn-muted);" @click="$emit('close')">
-          <i class="fa-solid fa-xmark" />
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Export -->
+          <button
+            class="px-2 py-1 text-xs border cursor-pointer flex items-center gap-1"
+            style="border-color:rgba(90,79,64,0.4); border-radius:2px; color:var(--vn-muted);"
+            :disabled="loading || entries.length === 0"
+            title="导出当前增强配置为 JSON"
+            @click="exportConfig"
+          >
+            <i class="fa-solid fa-file-export" style="font-size:0.65rem;" />
+            <span>导出</span>
+          </button>
+          <!-- Import -->
+          <button
+            class="px-2 py-1 text-xs border cursor-pointer flex items-center gap-1"
+            style="border-color:rgba(90,79,64,0.4); border-radius:2px; color:var(--vn-muted);"
+            :disabled="loading"
+            title="从 JSON 文件导入增强配置"
+            @click="triggerImport"
+          >
+            <i class="fa-solid fa-file-import" style="font-size:0.65rem;" />
+            <span>导入</span>
+          </button>
+          <input ref="importInputRef" type="file" accept=".json" style="display:none;" @change="onImportFile" />
+          <!-- Refresh -->
+          <button
+            class="px-2 py-1 text-xs border cursor-pointer"
+            style="border-color:rgba(90,79,64,0.4); border-radius:2px; color:var(--vn-muted);"
+            :disabled="loading"
+            @click="loadEntries"
+          >
+            <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-rotate'" style="font-size:0.65rem;" />
+          </button>
+          <button class="w-8 h-8 flex items-center justify-center cursor-pointer" style="color:var(--vn-muted);" @click="$emit('close')">
+            <i class="fa-solid fa-xmark" />
+          </button>
+        </div>
       </div>
 
       <!-- Info Banner -->
@@ -29,116 +63,136 @@
 
       <!-- Content -->
       <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height:calc(85vh - 180px);">
-        <div v-if="entries.length === 0" class="text-center py-8">
+
+        <!-- Loading -->
+        <div v-if="loading" class="text-center py-8">
+          <i class="fa-solid fa-spinner fa-spin text-2xl mb-3" style="color:rgba(90,79,64,0.5);" />
+          <p class="text-xs mt-2" style="color:var(--vn-muted);">加载中…</p>
+        </div>
+
+        <!-- Empty -->
+        <div v-else-if="entries.length === 0" class="text-center py-8">
           <i class="fa-solid fa-book-open text-4xl mb-3" style="color:rgba(90,79,64,0.3);" />
           <p class="text-sm" style="color:var(--vn-muted);">暂无世界书条目</p>
-          <p class="text-xs mt-1" style="color:rgba(139,125,107,0.5);">请在酒馆中添加世界书条目</p>
+          <p class="text-xs mt-1" style="color:rgba(139,125,107,0.5);">请在酒馆中为当前角色绑定世界书，或添加全局世界书</p>
         </div>
 
         <div v-else class="space-y-3">
-          <div
-            v-for="entry in entries"
-            :key="entry.uid"
-            class="p-4 border transition-all"
-            :style="{ 
-              borderColor: entry.enabled ? 'rgba(139,69,19,0.4)' : 'rgba(90,79,64,0.2)',
-              background: entry.enabled ? 'rgba(139,69,19,0.05)' : 'transparent',
-              opacity: entry.enabled ? 1 : 0.6
-            }"
-          >
-            <!-- Entry Header -->
-            <div class="flex items-start justify-between mb-3">
-              <div class="flex-1 min-w-0 mr-3">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm font-bold" style="color:rgba(212,197,160,0.9);">
-                    {{ entry.key || entry.comment || `条目 #${entry.uid}` }}
-                  </span>
-                  <span
-                    v-if="entry.linkedFeature"
-                    class="px-2 py-0.5 text-xs"
-                    :style="{ 
-                      background: getFeatureColor(entry.linkedFeature),
-                      color: 'rgba(42,36,32,0.9)',
-                      fontWeight: 'bold'
-                    }"
-                  >
-                    {{ getFeatureLabel(entry.linkedFeature) }}
-                  </span>
+          <!-- Worldbook group header when multiple books -->
+          <template v-for="(group, groupIdx) in entryGroups" :key="group.worldbookName">
+            <div
+              v-if="entryGroups.length > 1"
+              class="px-2 py-1 text-xs font-bold"
+              :style="{ color: 'var(--rust)', borderBottom: '1px solid rgba(139,69,19,0.2)', marginBottom: '4px' }"
+            >
+              <i class="fa-solid fa-book mr-1" />
+              {{ group.worldbookName }}
+            </div>
+            <div
+              v-for="entry in group.entries"
+              :key="`${group.worldbookName}-${entry.uid}`"
+              class="p-4 border transition-all"
+              :style="{
+                borderColor: entry.enabled ? 'rgba(139,69,19,0.4)' : 'rgba(90,79,64,0.2)',
+                background: entry.enabled ? 'rgba(139,69,19,0.05)' : 'transparent',
+                opacity: entry.enabled ? 1 : 0.6
+              }"
+            >
+              <!-- Entry Header -->
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex-1 min-w-0 mr-3">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-sm font-bold" style="color:rgba(212,197,160,0.9);">
+                      {{ entry.name || `条目 #${entry.uid}` }}
+                    </span>
+                    <span
+                      v-if="entry.linkedFeature"
+                      class="px-2 py-0.5 text-xs"
+                      :style="{
+                        background: getFeatureColor(entry.linkedFeature),
+                        color: 'rgba(42,36,32,0.9)',
+                        fontWeight: 'bold'
+                      }"
+                    >
+                      {{ getFeatureLabel(entry.linkedFeature) }}
+                    </span>
+                  </div>
+                  <p v-if="entry.content" class="text-xs truncate" style="color:var(--vn-muted);">
+                    {{ entry.content.slice(0, 80) }}{{ entry.content.length > 80 ? '…' : '' }}
+                  </p>
                 </div>
-                <p v-if="entry.comment" class="text-xs truncate" style="color:var(--vn-muted);">
-                  {{ entry.comment }}
-                </p>
-              </div>
-              <button
-                class="shrink-0 px-3 py-1.5 text-xs border transition-all"
-                :style="{ 
-                  borderColor: entry.enabled ? 'var(--rust)' : 'rgba(90,79,64,0.4)',
-                  color: entry.enabled ? 'var(--rust)' : 'var(--vn-muted)',
-                  fontWeight: entry.enabled ? 'bold' : 'normal'
-                }"
-                @click="toggleEntry(entry.uid)"
-              >
-                {{ entry.enabled ? '已启用' : '已禁用' }}
-              </button>
-            </div>
-
-            <!-- Entry Controls -->
-            <div class="grid grid-cols-2 gap-3">
-              <!-- Target API -->
-              <div>
-                <label class="block text-xs mb-1.5" style="color:rgba(212,197,160,0.7);">发送给</label>
-                <select
-                  :value="entry.targetApi"
-                  class="w-full px-2 py-1.5 text-xs border cursor-pointer"
-                  :style="{ 
-                    background: 'rgba(42,36,32,0.5)', 
-                    borderColor: 'rgba(90,79,64,0.4)', 
-                    color: 'rgba(212,197,160,0.9)' 
+                <button
+                  class="shrink-0 px-3 py-1.5 text-xs border transition-all"
+                  :disabled="entry.updating"
+                  :style="{
+                    borderColor: entry.enabled ? 'var(--rust)' : 'rgba(90,79,64,0.4)',
+                    color: entry.enabled ? 'var(--rust)' : 'var(--vn-muted)',
+                    fontWeight: entry.enabled ? 'bold' : 'normal',
+                    opacity: entry.updating ? 0.5 : 1,
                   }"
-                  @change="updateEntry(entry.uid, { targetApi: ($event.target as HTMLSelectElement).value as any })"
+                  @click="toggleEntry(entry, group.worldbookName)"
                 >
-                  <option value="main">主 API</option>
-                  <option value="second">第二 API</option>
-                  <option value="both">两者都发送</option>
-                </select>
+                  {{ entry.updating ? '…' : entry.enabled ? '已启用' : '已禁用' }}
+                </button>
               </div>
 
-              <!-- Linked Feature -->
-              <div>
-                <label class="block text-xs mb-1.5" style="color:rgba(212,197,160,0.7);">关联功能</label>
-                <select
-                  :value="entry.linkedFeature || ''"
-                  class="w-full px-2 py-1.5 text-xs border cursor-pointer"
-                  :style="{ 
-                    background: 'rgba(42,36,32,0.5)', 
-                    borderColor: 'rgba(90,79,64,0.4)', 
-                    color: 'rgba(212,197,160,0.9)' 
-                  }"
-                  @change="updateEntry(entry.uid, { linkedFeature: ($event.target as HTMLSelectElement).value || undefined })"
-                >
-                  <option value="">无</option>
-                  <option value="danmaku">弹幕</option>
-                  <option value="imageGen">生图</option>
-                  <option value="summary">总结</option>
-                </select>
+              <!-- Entry Controls -->
+              <div class="grid grid-cols-2 gap-3">
+                <!-- Target API -->
+                <div>
+                  <label class="block text-xs mb-1.5" style="color:rgba(212,197,160,0.7);">发送给</label>
+                  <select
+                    :value="entry.targetApi"
+                    class="w-full px-2 py-1.5 text-xs border cursor-pointer"
+                    :style="{
+                      background: 'rgba(42,36,32,0.5)',
+                      borderColor: 'rgba(90,79,64,0.4)',
+                      color: 'rgba(212,197,160,0.9)'
+                    }"
+                    @change="updateEntry(entry, group.worldbookName, { targetApi: ($event.target as HTMLSelectElement).value as any })"
+                  >
+                    <option value="main">主 API</option>
+                    <option value="second">第二 API</option>
+                    <option value="both">两者都发送</option>
+                  </select>
+                </div>
+
+                <!-- Linked Feature -->
+                <div>
+                  <label class="block text-xs mb-1.5" style="color:rgba(212,197,160,0.7);">关联功能</label>
+                  <select
+                    :value="entry.linkedFeature || ''"
+                    class="w-full px-2 py-1.5 text-xs border cursor-pointer"
+                    :style="{
+                      background: 'rgba(42,36,32,0.5)',
+                      borderColor: 'rgba(90,79,64,0.4)',
+                      color: 'rgba(212,197,160,0.9)'
+                    }"
+                    @change="updateEntry(entry, group.worldbookName, { linkedFeature: ($event.target as HTMLSelectElement).value || undefined })"
+                  >
+                    <option value="">无</option>
+                    <option value="danmaku">弹幕</option>
+                    <option value="imageGen">生图</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Auto Control -->
+              <div class="mt-3 pt-3" :style="{ borderTop: '1px solid rgba(90,79,64,0.15)' }">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="entry.autoControl"
+                    class="cursor-pointer"
+                    @change="updateEntry(entry, group.worldbookName, { autoControl: ($event.target as HTMLInputElement).checked })"
+                  />
+                  <span class="text-xs" style="color:rgba(212,197,160,0.8);">
+                    自动控制（根据关联功能的开关自动启用/禁用此条目）
+                  </span>
+                </label>
               </div>
             </div>
-
-            <!-- Auto Control -->
-            <div class="mt-3 pt-3" :style="{ borderTop: '1px solid rgba(90,79,64,0.15)' }">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="entry.autoControl"
-                  class="cursor-pointer"
-                  @change="updateEntry(entry.uid, { autoControl: ($event.target as HTMLInputElement).checked })"
-                />
-                <span class="text-xs" style="color:rgba(212,197,160,0.8);">
-                  自动控制（根据关联功能的开关自动启用/禁用此条目）
-                </span>
-              </label>
-            </div>
-          </div>
+          </template>
         </div>
       </div>
 
@@ -149,39 +203,124 @@
 </template>
 
 <script setup lang="ts">
-import { useVNStore, type WorldbookEntryEnhanced } from './store';
-
 defineEmits<{
   close: [];
 }>();
 
-const store = useVNStore();
-
-const entries = ref<WorldbookEntryEnhanced[]>([]);
-
-function loadEntries() {
-  entries.value = store.getEnhancedWorldbook();
+interface EnhancedEntry {
+  uid: number;
+  name: string;
+  enabled: boolean;
+  content: string;
+  targetApi: 'main' | 'second' | 'both';
+  autoControl: boolean;
+  linkedFeature?: string;
+  updating?: boolean;
 }
 
-function toggleEntry(uid: number) {
-  const entry = entries.value.find(e => e.uid === uid);
-  if (entry) {
-    store.updateWorldbookEntry(uid, { enabled: !entry.enabled });
-    loadEntries();
+interface EntryGroup {
+  worldbookName: string;
+  entries: EnhancedEntry[];
+}
+
+const loading = ref(false);
+const entryGroups = ref<EntryGroup[]>([]);
+const importInputRef = ref<HTMLInputElement>();
+
+const entries = computed(() => entryGroups.value.flatMap(g => g.entries));
+
+function getAllCurrentWorldbookNames(): string[] {
+  const names: string[] = [];
+  try {
+    const charWbs = getCharWorldbookNames('current');
+    if (charWbs.primary) names.push(charWbs.primary);
+    names.push(...charWbs.additional);
+  } catch {}
+  try {
+    const chatWbName = getChatWorldbookName('current');
+    if (chatWbName && !names.includes(chatWbName)) names.push(chatWbName);
+  } catch {}
+  try {
+    for (const n of getGlobalWorldbookNames()) {
+      if (!names.includes(n)) names.push(n);
+    }
+  } catch {}
+  return names;
+}
+
+async function loadEntries() {
+  loading.value = true;
+  try {
+    const names = getAllCurrentWorldbookNames();
+    const groups: EntryGroup[] = [];
+    for (const name of names) {
+      try {
+        const wbEntries = await getWorldbook(name);
+        groups.push({
+          worldbookName: name,
+          entries: wbEntries.map(entry => ({
+            uid: entry.uid,
+            name: entry.name || `条目 #${entry.uid}`,
+            enabled: entry.enabled,
+            content: entry.content ?? '',
+            targetApi: (entry.extra?.targetApi as 'main' | 'second' | 'both') ?? 'main',
+            autoControl: entry.extra?.autoControl ?? false,
+            linkedFeature: entry.extra?.linkedFeature,
+          })),
+        });
+      } catch (e) {
+        console.warn(`[WorldbookManager] 加载世界书 "${name}" 失败:`, e);
+      }
+    }
+    entryGroups.value = groups;
+  } finally {
+    loading.value = false;
   }
 }
 
-function updateEntry(uid: number, updates: Partial<WorldbookEntryEnhanced>) {
-  store.updateWorldbookEntry(uid, updates);
-  loadEntries();
+async function toggleEntry(entry: EnhancedEntry, worldbookName: string) {
+  entry.updating = true;
+  const newEnabled = !entry.enabled;
+  try {
+    await updateWorldbookWith(
+      worldbookName,
+      wb => wb.map(e => (e.uid === entry.uid ? { ...e, enabled: newEnabled } : e)),
+      { render: 'debounced' },
+    );
+    entry.enabled = newEnabled;
+  } catch (e) {
+    console.error('[WorldbookManager] 切换条目状态失败:', e);
+  } finally {
+    entry.updating = false;
+  }
+}
+
+async function updateEntry(entry: EnhancedEntry, worldbookName: string, updates: Partial<EnhancedEntry>) {
+  const { targetApi, autoControl, linkedFeature, enabled } = updates;
+  try {
+    await updateWorldbookWith(
+      worldbookName,
+      wb =>
+        wb.map(e => {
+          if (e.uid !== entry.uid) return e;
+          const extra = { ...e.extra };
+          if (targetApi !== undefined) extra.targetApi = targetApi;
+          if (autoControl !== undefined) extra.autoControl = autoControl;
+          if (linkedFeature !== undefined) extra.linkedFeature = linkedFeature;
+          const result: any = { ...e, extra };
+          if (enabled !== undefined) result.enabled = enabled;
+          return result;
+        }),
+      { render: 'debounced' },
+    );
+    Object.assign(entry, updates);
+  } catch (e) {
+    console.error('[WorldbookManager] 更新条目失败:', e);
+  }
 }
 
 function getFeatureLabel(feature: string): string {
-  const labels: Record<string, string> = {
-    danmaku: '弹幕',
-    imageGen: '生图',
-    summary: '总结',
-  };
+  const labels: Record<string, string> = { danmaku: '弹幕', imageGen: '生图' };
   return labels[feature] || feature;
 }
 
@@ -189,14 +328,94 @@ function getFeatureColor(feature: string): string {
   const colors: Record<string, string> = {
     danmaku: 'rgba(139,69,19,0.6)',
     imageGen: 'rgba(212,197,160,0.6)',
-    summary: 'rgba(90,79,64,0.6)',
   };
   return colors[feature] || 'rgba(90,79,64,0.6)';
 }
 
-onMounted(() => {
-  loadEntries();
-});
+// ====== Export / Import ======
+
+interface ExportedEntry {
+  uid: number;
+  name: string;
+  targetApi: 'main' | 'second' | 'both';
+  autoControl: boolean;
+  linkedFeature?: string;
+}
+interface ExportedConfig {
+  version: 1;
+  worldbooks: Record<string, ExportedEntry[]>;
+}
+
+function exportConfig() {
+  const config: ExportedConfig = { version: 1, worldbooks: {} };
+  for (const group of entryGroups.value) {
+    config.worldbooks[group.worldbookName] = group.entries.map(e => ({
+      uid: e.uid,
+      name: e.name,
+      targetApi: e.targetApi,
+      autoControl: e.autoControl,
+      linkedFeature: e.linkedFeature,
+    }));
+  }
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `worldbook-config-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function triggerImport() {
+  importInputRef.value?.click();
+}
+
+async function onImportFile(evt: Event) {
+  const input = evt.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+
+  let config: ExportedConfig;
+  try {
+    const text = await file.text();
+    config = JSON.parse(text) as ExportedConfig;
+    if (config.version !== 1 || typeof config.worldbooks !== 'object') throw new Error('格式不正确');
+  } catch (e: any) {
+    alert(`导入失败：${e.message || '文件格式错误'}`);
+    return;
+  }
+
+  loading.value = true;
+  let applied = 0;
+  try {
+    for (const [wbName, exportedEntries] of Object.entries(config.worldbooks)) {
+      const group = entryGroups.value.find(g => g.worldbookName === wbName);
+      if (!group) continue;
+      // Build uid → exported map
+      const exportMap = new Map(exportedEntries.map(e => [e.uid, e]));
+      for (const entry of group.entries) {
+        const ex = exportMap.get(entry.uid);
+        if (!ex) continue;
+        const updates: Partial<EnhancedEntry> = {};
+        if (ex.targetApi !== entry.targetApi) updates.targetApi = ex.targetApi;
+        if (ex.autoControl !== entry.autoControl) updates.autoControl = ex.autoControl;
+        if (ex.linkedFeature !== entry.linkedFeature) updates.linkedFeature = ex.linkedFeature;
+        if (Object.keys(updates).length > 0) {
+          await updateEntry(entry, wbName, updates);
+          applied++;
+        }
+      }
+    }
+    alert(`导入完成，已更新 ${applied} 个条目的增强配置。`);
+  } catch (e: any) {
+    alert(`导入出错：${e.message}`);
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(loadEntries);
 
 const panelStyle = {
   maxHeight: '85vh',

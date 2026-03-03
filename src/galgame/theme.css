@@ -303,6 +303,12 @@ body {
   background: rgba(212, 197, 160, 0.05);
 }
 
+/* === Select option colors (for readability on system dropdowns) === */
+select option {
+  background: #2d2620;
+  color: #d4c5a0;
+}
+
 /* === Input field === */
 .vn-input {
   background: rgba(74, 64, 53, 0.3);

@@ -1,0 +1,55 @@
+<%_ setLocalVar('initialized_lorebooks.世界崩坏中[0]', true); _%>
+**变量更新**
+在所有文本的最后，进行变量更新。
+严格按照以下规则和格式进行输出，并确定每一个变量是否需要更新，不要遗漏：
+```yaml
+rule:
+  description:
+    - You should output the update analysis in the end of the next response, following the variables list defined in `stat_data` section, which shows the status of the previous turn.
+    - In context, variable updates are omitted by the system so they are not shown to you, but you should still add it.
+    - There are 4 commands can be used to adjust the data.
+    - _.set: Used to set a certain simple value (strings, numbers, booleans). It only supports 2 input args, and it doesn't support arrays or objects as inputs.
+      _.assign: Used to insert something into an array or object. It supports 2 or 3 input args.
+      _.remove: Used to delete something from an array or object. It supports 1 or 2 input args.
+      _.add: Used to add a delta to a number. It only supports 2 input args, and only supports modifications to numbers.
+    - If you need to assign or remove multiple values, use `_.assign` or `_.remove` multiple times, not in a single command.
+    - !!!Never clear or remove a data array or object directly, they are protected by the schema, the command will be blocked!!!
+  analysis:
+    - You must rethink what variables are defined, and analyze how to update each of them accordingly.
+    - For counting variables, change it when the corresponding event occur but don't change it any more during the same event.
+    - When a numerical variable changes, check if it crosses any stage threshold and update to the corresponding stage.
+  format: |-
+    <UpdateVariable>
+        <Analysis>$(IN ENGLISH$)
+            - calculate time passed: ...
+            - decide whether dramatic updates are allowed as it's in a special case or the time passed is more than usual: yes or no
+            - list every variable node that is with a comment, and its data type...
+            - Check the comment of this variable and analyze whether it satisfies its change conditions. If yes, decide which command should be used. Do not output reason:...
+            - Ignore summary related content when evaluate.
+            ...
+        </Analysis>
+        _.set('${path}', ${value});//${reason}
+        _.assign('${path}', ${key}?, ${value});//${reason}
+        _.remove('${path}', ${key_or_value}?);//${reason}
+        _.add('${path}', ${delta});//${reason}
+    </UpdateVariable>
+  example: |-
+    <UpdateVariable>
+        <Analysis>
+            当前时间: string, Y, set
+            当前位置: string, N
+            主线任务: object, Y, assign/remove
+            玲奈.亲密度: float, Y, add
+            玲奈.重要成就: object, Y, assign
+            玲奈.着装: array, Y, remove
+            ...
+        </Analysis>
+        _.set('当前时间', '09:00', '09:15');//时间流逝
+        _.assign('主线任务.已完成', '在2022年10月21日周五前，与一位同学组队完成量子态叠加原理的课题报告。');//完成主线任务
+        _.remove('主线任务.进行中', '在2022年10月21日周五前，与一位同学组队完成量子态叠加原理的课题报告。');//完成主线任务
+        _.add('玲奈.亲密度', 0.007);//玲奈感到非常开心
+        _.assign('玲奈.重要成就', {"2022年10月17日": "玲奈与<user>相遇。"});//玲奈与<user>首次相遇
+        _.set('玲奈.重要成就.2022年10月17日', '玲奈与<user>相遇，并交换了手机号');//更新成就
+        _.remove('玲奈.着装', '白色棉质内裤');//玲奈脱下了内裤
+    </UpdateVariable>
+```
