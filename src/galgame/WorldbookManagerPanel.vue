@@ -1,6 +1,6 @@
 <template>
-  <div class="absolute inset-0 flex items-center justify-center" style="z-index:50;">
-    <div class="absolute inset-0 backdrop-blur-sm" style="background:rgba(42,36,32,0.7);" @click="$emit('close')" />
+  <div class="absolute inset-0 flex items-center justify-center" style="z-index: 50">
+    <div class="absolute inset-0 backdrop-blur-sm" style="background: rgba(42, 36, 32, 0.7)" @click="$emit('close')" />
 
     <div class="relative w-full max-w-3xl mx-4 border overflow-hidden animate-fade-in-up" :style="panelStyle">
       <div :style="decoTop" />
@@ -10,71 +10,81 @@
       <div class="flex items-center justify-between px-6 py-4" :style="headerBorder">
         <div class="flex items-center gap-3">
           <div class="stamp-effect">
-            <span style="color:var(--rust); font-size:0.75rem; font-weight:bold; letter-spacing:0.15em;">WORLDBOOK</span>
+            <span style="color: var(--rust); font-size: 0.75rem; font-weight: bold; letter-spacing: 0.15em"
+              >WORLDBOOK</span
+            >
           </div>
-          <h2 class="text-lg font-bold tracking-widest" style="color:rgba(212,197,160,0.9);">世界书管理</h2>
+          <h2 class="text-lg font-bold tracking-widest" style="color: rgba(212, 197, 160, 0.9)">世界书管理</h2>
         </div>
         <div class="flex items-center gap-2">
           <!-- Export -->
           <button
             class="px-2 py-1 text-xs border cursor-pointer flex items-center gap-1"
-            style="border-color:rgba(90,79,64,0.4); border-radius:2px; color:var(--vn-muted);"
+            style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
             :disabled="loading || entries.length === 0"
             title="导出当前增强配置为 JSON"
             @click="exportConfig"
           >
-            <i class="fa-solid fa-file-export" style="font-size:0.65rem;" />
+            <i class="fa-solid fa-file-export" style="font-size: 0.65rem" />
             <span>导出</span>
           </button>
           <!-- Import -->
           <button
             class="px-2 py-1 text-xs border cursor-pointer flex items-center gap-1"
-            style="border-color:rgba(90,79,64,0.4); border-radius:2px; color:var(--vn-muted);"
+            style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
             :disabled="loading"
             title="从 JSON 文件导入增强配置"
             @click="triggerImport"
           >
-            <i class="fa-solid fa-file-import" style="font-size:0.65rem;" />
+            <i class="fa-solid fa-file-import" style="font-size: 0.65rem" />
             <span>导入</span>
           </button>
-          <input ref="importInputRef" type="file" accept=".json" style="display:none;" @change="onImportFile" />
+          <input ref="importInputRef" type="file" accept=".json" style="display: none" @change="onImportFile" />
           <!-- Refresh -->
           <button
             class="px-2 py-1 text-xs border cursor-pointer"
-            style="border-color:rgba(90,79,64,0.4); border-radius:2px; color:var(--vn-muted);"
+            style="border-color: rgba(90, 79, 64, 0.4); border-radius: 2px; color: var(--vn-muted)"
             :disabled="loading"
             @click="loadEntries"
           >
-            <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-rotate'" style="font-size:0.65rem;" />
+            <i :class="loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-rotate'" style="font-size: 0.65rem" />
           </button>
-          <button class="w-8 h-8 flex items-center justify-center cursor-pointer" style="color:var(--vn-muted);" @click="$emit('close')">
+          <button
+            class="w-8 h-8 flex items-center justify-center cursor-pointer"
+            style="color: var(--vn-muted)"
+            @click="$emit('close')"
+          >
             <i class="fa-solid fa-xmark" />
           </button>
         </div>
       </div>
 
       <!-- Info Banner -->
-      <div class="px-6 py-3" :style="{ borderBottom: '1px solid rgba(90,79,64,0.2)', background: 'rgba(139,69,19,0.1)' }">
-        <div class="text-xs" style="color:rgba(212,197,160,0.8);">
-          <i class="fa-solid fa-circle-info mr-2" style="color:var(--rust);" />
+      <div
+        class="px-6 py-3"
+        :style="{ borderBottom: '1px solid rgba(90,79,64,0.2)', background: 'rgba(139,69,19,0.1)' }"
+      >
+        <div class="text-xs" style="color: rgba(212, 197, 160, 0.8)">
+          <i class="fa-solid fa-circle-info mr-2" style="color: var(--rust)" />
           管理世界书条目的启用状态、API 分配和自动控制。自动控制的条目会根据功能开关自动启用/禁用。
         </div>
       </div>
 
       <!-- Content -->
-      <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height:calc(85vh - 180px);">
-
+      <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height: 600px">
         <!-- Loading -->
         <div v-if="loading" class="text-center py-8">
-          <i class="fa-solid fa-spinner fa-spin text-2xl mb-3" style="color:rgba(90,79,64,0.5);" />
-          <p class="text-xs mt-2" style="color:var(--vn-muted);">加载中…</p>
+          <i class="fa-solid fa-spinner fa-spin text-2xl mb-3" style="color: rgba(90, 79, 64, 0.5)" />
+          <p class="text-xs mt-2" style="color: var(--vn-muted)">加载中…</p>
         </div>
 
         <!-- Empty -->
         <div v-else-if="entries.length === 0" class="text-center py-8">
-          <i class="fa-solid fa-book-open text-4xl mb-3" style="color:rgba(90,79,64,0.3);" />
-          <p class="text-sm" style="color:var(--vn-muted);">暂无世界书条目</p>
-          <p class="text-xs mt-1" style="color:rgba(139,125,107,0.5);">请在酒馆中为当前角色绑定世界书，或添加全局世界书</p>
+          <i class="fa-solid fa-book-open text-4xl mb-3" style="color: rgba(90, 79, 64, 0.3)" />
+          <p class="text-sm" style="color: var(--vn-muted)">暂无世界书条目</p>
+          <p class="text-xs mt-1" style="color: rgba(139, 125, 107, 0.5)">
+            请在酒馆中为当前角色绑定世界书，或添加全局世界书
+          </p>
         </div>
 
         <div v-else class="space-y-3">
@@ -95,14 +105,14 @@
               :style="{
                 borderColor: entry.enabled ? 'rgba(139,69,19,0.4)' : 'rgba(90,79,64,0.2)',
                 background: entry.enabled ? 'rgba(139,69,19,0.05)' : 'transparent',
-                opacity: entry.enabled ? 1 : 0.6
+                opacity: entry.enabled ? 1 : 0.6,
               }"
             >
               <!-- Entry Header -->
               <div class="flex items-start justify-between mb-3">
                 <div class="flex-1 min-w-0 mr-3">
                   <div class="flex items-center gap-2 mb-1">
-                    <span class="text-sm font-bold" style="color:rgba(212,197,160,0.9);">
+                    <span class="text-sm font-bold" style="color: rgba(212, 197, 160, 0.9)">
                       {{ entry.name || `条目 #${entry.uid}` }}
                     </span>
                     <span
@@ -111,13 +121,13 @@
                       :style="{
                         background: getFeatureColor(entry.linkedFeature),
                         color: 'rgba(42,36,32,0.9)',
-                        fontWeight: 'bold'
+                        fontWeight: 'bold',
                       }"
                     >
                       {{ getFeatureLabel(entry.linkedFeature) }}
                     </span>
                   </div>
-                  <p v-if="entry.content" class="text-xs truncate" style="color:var(--vn-muted);">
+                  <p v-if="entry.content" class="text-xs truncate" style="color: var(--vn-muted)">
                     {{ entry.content.slice(0, 80) }}{{ entry.content.length > 80 ? '…' : '' }}
                   </p>
                 </div>
@@ -140,16 +150,20 @@
               <div class="grid grid-cols-2 gap-3">
                 <!-- Target API -->
                 <div>
-                  <label class="block text-xs mb-1.5" style="color:rgba(212,197,160,0.7);">发送给</label>
+                  <label class="block text-xs mb-1.5" style="color: rgba(212, 197, 160, 0.7)">发送给</label>
                   <select
                     :value="entry.targetApi"
                     class="w-full px-2 py-1.5 text-xs border cursor-pointer"
                     :style="{
                       background: 'rgba(42,36,32,0.5)',
                       borderColor: 'rgba(90,79,64,0.4)',
-                      color: 'rgba(212,197,160,0.9)'
+                      color: 'rgba(212,197,160,0.9)',
                     }"
-                    @change="updateEntry(entry, group.worldbookName, { targetApi: ($event.target as HTMLSelectElement).value as any })"
+                    @change="
+                      updateEntry(entry, group.worldbookName, {
+                        targetApi: ($event.target as HTMLSelectElement).value as any,
+                      })
+                    "
                   >
                     <option value="main">主 API</option>
                     <option value="second">第二 API</option>
@@ -159,16 +173,20 @@
 
                 <!-- Linked Feature -->
                 <div>
-                  <label class="block text-xs mb-1.5" style="color:rgba(212,197,160,0.7);">关联功能</label>
+                  <label class="block text-xs mb-1.5" style="color: rgba(212, 197, 160, 0.7)">关联功能</label>
                   <select
                     :value="entry.linkedFeature || ''"
                     class="w-full px-2 py-1.5 text-xs border cursor-pointer"
                     :style="{
                       background: 'rgba(42,36,32,0.5)',
                       borderColor: 'rgba(90,79,64,0.4)',
-                      color: 'rgba(212,197,160,0.9)'
+                      color: 'rgba(212,197,160,0.9)',
                     }"
-                    @change="updateEntry(entry, group.worldbookName, { linkedFeature: ($event.target as HTMLSelectElement).value || undefined })"
+                    @change="
+                      updateEntry(entry, group.worldbookName, {
+                        linkedFeature: ($event.target as HTMLSelectElement).value || undefined,
+                      })
+                    "
                   >
                     <option value="">无</option>
                     <option value="danmaku">弹幕</option>
@@ -184,9 +202,13 @@
                     type="checkbox"
                     :checked="entry.autoControl"
                     class="cursor-pointer"
-                    @change="updateEntry(entry, group.worldbookName, { autoControl: ($event.target as HTMLInputElement).checked })"
+                    @change="
+                      updateEntry(entry, group.worldbookName, {
+                        autoControl: ($event.target as HTMLInputElement).checked,
+                      })
+                    "
                   />
-                  <span class="text-xs" style="color:rgba(212,197,160,0.8);">
+                  <span class="text-xs" style="color: rgba(212, 197, 160, 0.8)">
                     自动控制（根据关联功能的开关自动启用/禁用此条目）
                   </span>
                 </label>
@@ -418,14 +440,28 @@ async function onImportFile(evt: Event) {
 onMounted(loadEntries);
 
 const panelStyle = {
-  maxHeight: '85vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
 };
 const headerBorder = { borderBottom: '1px solid rgba(90,79,64,0.3)' };
-const decoTop = { height: '3px', background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)' };
-const decoTopThin = { height: '1px', marginTop: '1px', background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.3), transparent)' };
-const decoBottomThin = { height: '1px', background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.3), transparent)' };
-const decoBottom = { height: '2px', marginTop: '1px', background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.5), transparent)' };
+const decoTop = {
+  height: '3px',
+  background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)',
+};
+const decoTopThin = {
+  height: '1px',
+  marginTop: '1px',
+  background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.3), transparent)',
+};
+const decoBottomThin = {
+  height: '1px',
+  background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.3), transparent)',
+};
+const decoBottom = {
+  height: '2px',
+  marginTop: '1px',
+  background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.5), transparent)',
+};
 </script>

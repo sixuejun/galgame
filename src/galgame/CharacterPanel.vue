@@ -12,8 +12,8 @@
       <img
         :src="store.userCharacter.avatarUrl"
         :alt="store.userCharacter.name"
-        class="max-w-[80vw] max-h-[80vh] object-contain border"
-        style="border-color:rgba(90,79,64,0.3); filter:sepia(0.2) contrast(0.9);"
+        class="object-contain border"
+        style="max-width:80%; max-height:600px; border-color:rgba(90,79,64,0.3); filter:sepia(0.2) contrast(0.9);"
       />
     </div>
 
@@ -35,7 +35,7 @@
       </div>
 
       <!-- Content -->
-      <div class="px-6 py-5 overflow-y-auto no-scrollbar" style="max-height:calc(85vh - 80px);">
+      <div class="px-6 py-5 overflow-y-auto no-scrollbar" style="max-height:600px;">
         <!-- User character section -->
         <div class="mb-8">
           <div class="flex items-center gap-2 mb-4">
@@ -176,7 +176,7 @@ const editingName = ref(false);
 const nameValue = ref(store.userCharacter.name);
 
 const panelStyle = {
-  maxHeight: '85vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',

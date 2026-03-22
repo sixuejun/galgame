@@ -10,6 +10,58 @@
       @click.stop
     >
       <div class="flex flex-col gap-2">
+        <!-- Board Game Entry (always visible) -->
+        <button
+          class="relative w-full text-left border transition-all duration-200 cursor-pointer"
+          :style="{
+            borderColor: 'rgba(139,69,19,0.5)',
+            background: 'rgba(42,36,32,0.85)',
+            opacity: store.choiceLocked ? 0.5 : 1,
+            pointerEvents: store.choiceLocked ? 'none' : 'auto',
+            borderRadius: '2px',
+          }"
+          :disabled="store.choiceLocked"
+          @click.stop="handleBoardGameClick"
+        >
+          <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(196,162,101,0.3), transparent)' }" />
+          <div class="p-3 flex items-center gap-3">
+            <i class="fa-solid fa-dice-d6" style="color:var(--stain); font-size:0.875rem;" />
+            <span class="text-sm" style="color:rgba(196,162,101,0.9); font-weight:500;">投个骰子</span>
+            <span style="font-size:9px; color:rgba(139,125,107,0.5); margin-left:auto; font-family:monospace;">废土行路</span>
+          </div>
+        </button>
+
+        <!-- Temp options from board game -->
+        <template v-if="store.tempOptions.length > 0">
+          <div
+            style="font-size:9px; color:var(--stain); font-family:monospace; text-align:center; padding:4px 0; letter-spacing:0.1em;"
+          >
+            ◈ 事件选项 ◈
+          </div>
+          <button
+            v-for="(option, index) in store.tempOptions"
+            :key="option.choiceId"
+            class="relative w-full text-left border transition-all duration-200 cursor-pointer"
+            :style="{
+              borderColor: isSelected(option.choiceId) ? 'var(--rust)' : 'rgba(196,162,101,0.6)',
+              background: isSelected(option.choiceId) ? 'var(--vn-choice-selected)' : 'rgba(58,51,44,0.9)',
+              opacity: store.choiceLocked ? 0.5 : 1,
+              pointerEvents: store.choiceLocked ? 'none' : 'auto',
+              borderRadius: '2px',
+            }"
+            :disabled="store.choiceLocked"
+            @click.stop="handleSelect(option.choiceId)"
+          >
+            <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(196,162,101,0.3), transparent)' }" />
+            <div class="p-3 flex items-center gap-3">
+              <span style="color:var(--stain); font-family:monospace; font-size:0.75rem; opacity:0.6;">
+                {{ String.fromCharCode(65 + index) }}.
+              </span>
+              <span class="text-sm" style="color:rgba(212,197,160,0.9);">{{ option.text }}</span>
+            </div>
+          </button>
+        </template>
+
         <template v-for="(choice, index) in choices" :key="choice.choiceId">
           <!-- Custom input choice -->
           <div
@@ -96,6 +148,12 @@ let submitTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function isSelected(id: string) {
   return store.selectedChoiceId === id;
+}
+
+function handleBoardGameClick() {
+  if (store.choiceLocked) return;
+  store.activeModuleId = 'board_game';
+  store.setOverlay('gameplay');
 }
 
 function handleSelect(choiceId: string) {

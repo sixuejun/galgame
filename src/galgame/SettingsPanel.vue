@@ -30,7 +30,7 @@
       </div>
 
       <!-- Content -->
-      <div class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: calc(85vh - 80px)">
+      <div class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: 600px">
         <!-- Volume -->
         <SectionHeader icon="fa-volume-high" title="音量设置" />
         <div class="mb-6 pl-2">
@@ -85,22 +85,6 @@
             />
           </div>
           <template v-if="store.settings.danmakuEnabled">
-            <div class="flex items-center justify-between py-2">
-              <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">发送时附带聊天记录</span>
-              <ToggleSwitch
-                :checked="store.settings.danmakuSendChatHistory"
-                @update="v => store.updateSettings({ danmakuSendChatHistory: v })"
-              />
-            </div>
-            <template v-if="store.settings.danmakuSendChatHistory">
-              <SliderRow
-                label="最多附带层数"
-                :value="store.settings.danmakuChatHistoryDepth"
-                :min="1"
-                :max="currentFloorCount"
-                @update="v => store.updateSettings({ danmakuChatHistoryDepth: v })"
-              />
-            </template>
             <SliderRow
               label="弹幕速度"
               :value="store.settings.danmakuSpeed"
@@ -230,12 +214,12 @@
               <button
                 class="flex shrink-0 cursor-pointer items-center gap-1.5 border px-2.5 py-1 text-xs transition-all"
                 :style="{
-                  borderColor: store.secondApiStatus === 'available' ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
-                  color: store.secondApiStatus === 'available' ? 'var(--vn-fg)' : 'var(--vn-muted)',
+                  borderColor: canTestSecondApi ? 'var(--rust)' : 'rgba(90,79,64,0.2)',
+                  color: canTestSecondApi ? 'var(--vn-fg)' : 'var(--vn-muted)',
                   borderRadius: '2px',
-                  opacity: store.secondApiStatus === 'available' ? 1 : 0.4,
+                  opacity: canTestSecondApi ? 1 : 0.4,
                 }"
-                :disabled="store.secondApiStatus === 'disabled' || testingSecondApi"
+                :disabled="!canTestSecondApi || testingSecondApi"
                 @click="testSecondApi"
               >
                 <i
@@ -485,6 +469,11 @@ const presetList = ref<string[]>([]);
 const showApiTaskConfig = ref(false);
 const showWorldbookManager = ref(false);
 
+// 只要 URL 和 Key 已填写就允许测试（不依赖 secondApiStatus 避免降级状态干扰）
+const canTestSecondApi = computed(
+  () => !!(store.settings.secondApiUrl?.trim() && store.settings.secondApiKey?.trim()),
+);
+
 function refreshPresetList() {
   loadingPresetList.value = true;
   try {
@@ -499,6 +488,10 @@ function refreshPresetList() {
 }
 
 async function testSecondApi() {
+  if (!store.settings.secondApiModel?.trim()) {
+    store.showToast('请先在「拉取模型」后选择一个模型，再测试连接');
+    return;
+  }
   testingSecondApi.value = true;
   secondApiTestResult.value = null;
   const success = await store.testSecondApiConnection();
@@ -506,7 +499,7 @@ async function testSecondApi() {
   testingSecondApi.value = false;
   setTimeout(() => {
     secondApiTestResult.value = null;
-  }, 4000);
+  }, 5000);
 }
 
 const SKIN_PRESETS = [
@@ -523,7 +516,7 @@ const danmakuDisplayOptions = [
 ];
 
 const panelStyle = {
-  maxHeight: '85vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
@@ -562,8 +555,6 @@ function handleReset() {
     danmakuSpeed: 5,
     danmakuLoop: false,
     danmakuDisplay: 'third',
-    danmakuSendChatHistory: false,
-    danmakuChatHistoryDepth: 10,
     secondApiModel: '',
     secondApiPreset: '',
     secondApiStream: false,

@@ -27,7 +27,7 @@
       </div>
 
       <!-- Dialogue list -->
-      <div ref="scrollRef" class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height:calc(85vh - 180px);">
+      <div ref="scrollRef" class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height:600px;">
         <div
           v-for="(line, index) in historyLines"
           :key="index"
@@ -98,7 +98,7 @@ function goToLine(index: number) {
 }
 
 const panelStyle = {
-  maxHeight: '85vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',

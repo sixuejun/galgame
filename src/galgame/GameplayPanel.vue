@@ -74,7 +74,7 @@
       </div>
 
       <!-- Module Grid -->
-      <div ref="moduleGridRef" class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: calc(85vh - 250px)">
+      <div ref="moduleGridRef" class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: 500px">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <button
             v-for="mod in displayModules"
@@ -226,17 +226,17 @@
               <!-- @ Context Tag -->
               <div v-if="atContextTag" class="sys-at-tag-row">
                 <span class="sys-at-tag">
-                  <i class="fa-solid fa-at" style="font-size:8px;" />
+                  <i class="fa-solid fa-at" style="font-size: 8px" />
                   {{ atContextTag }}
                 </span>
                 <button class="sys-at-tag-remove" @click="clearAtContext">
-                  <i class="fa-solid fa-xmark" style="font-size:9px;" />
+                  <i class="fa-solid fa-xmark" style="font-size: 9px" />
                 </button>
               </div>
               <!-- @ Floor Picker (inline popup) -->
               <div v-if="showAtPicker" class="sys-at-picker">
                 <div class="sys-at-picker-title">
-                  <i class="fa-solid fa-at" style="font-size:9px;" />
+                  <i class="fa-solid fa-at" style="font-size: 9px" />
                   引用楼层（当前共 {{ maxFloorId + 1 }} 楼，0 ~ {{ maxFloorId }}）
                 </div>
                 <div class="sys-at-picker-row">
@@ -250,7 +250,7 @@
                   <button class="sys-at-confirm-btn" @click="confirmAtFloor">确认</button>
                   <button class="sys-at-cancel-btn" @click="showAtPicker = false">取消</button>
                 </div>
-                <div style="font-size:9px; color:var(--vn-muted); margin-top:4px; font-family:monospace;">
+                <div style="font-size: 9px; color: var(--vn-muted); margin-top: 4px; font-family: monospace">
                   提示：单楼层填数字，区间填"起-止"
                 </div>
               </div>
@@ -263,7 +263,7 @@
                   :title="'引用楼层内容作为剧情参考'"
                   @click="toggleAtPicker"
                 >
-                  <i class="fa-solid fa-at" style="font-size:0.85rem;" />
+                  <i class="fa-solid fa-at" style="font-size: 0.85rem" />
                 </button>
                 <input
                   v-model="systemChatInput"
@@ -279,7 +279,7 @@
                   title="查看上次发送的提示词"
                   @click="showPromptDebug = true"
                 >
-                  <i class="fa-solid fa-eye" style="font-size:0.75rem;" />
+                  <i class="fa-solid fa-eye" style="font-size: 0.75rem" />
                 </button>
                 <button
                   class="sys-send-btn"
@@ -300,7 +300,12 @@
             <div v-if="showPromptDebug" class="sys-prompt-debug-overlay" @click.self="showPromptDebug = false">
               <div class="sys-prompt-debug-panel">
                 <div class="sys-prompt-debug-header">
-                  <span><i class="fa-solid fa-terminal" style="margin-right:6px;color:var(--rust);" />上次发送给第二API的提示词</span>
+                  <span
+                    ><i
+                      class="fa-solid fa-terminal"
+                      style="margin-right: 6px; color: var(--rust)"
+                    />上次发送给第二API的提示词</span
+                  >
                   <button class="sys-prompt-debug-close" @click="showPromptDebug = false">
                     <i class="fa-solid fa-xmark" />
                   </button>
@@ -316,9 +321,7 @@
                     <pre class="sys-prompt-content">{{ p.content }}</pre>
                   </div>
                 </div>
-                <div class="sys-prompt-debug-footer">
-                  提示词结构：System → History → Context（@引用）→ User Input
-                </div>
+                <div class="sys-prompt-debug-footer">提示词结构：System → History → Context（@引用）→ User Input</div>
               </div>
             </div>
           </div>
@@ -339,7 +342,7 @@ import { calcCommission, useVNStore } from './store';
 const store = useVNStore();
 
 const panelStyle = {
-  maxHeight: '85vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
@@ -374,11 +377,15 @@ const transitioning = ref(false);
 // --- @ Floor picker ---
 const showAtPicker = ref(false);
 const atFloorInput = ref('');
-const atContextTag = ref('');   // e.g. "楼层 3" or "楼层 1-5"
-const atContextText = ref('');  // actual content to inject
+const atContextTag = ref(''); // e.g. "楼层 3" or "楼层 1-5"
+const atContextText = ref(''); // actual content to inject
 
 const maxFloorId = computed(() => {
-  try { return getLastMessageId(); } catch { return 0; }
+  try {
+    return getLastMessageId();
+  } catch {
+    return 0;
+  }
 });
 
 function toggleAtPicker() {
@@ -416,11 +423,13 @@ async function confirmAtFloor() {
     return;
   }
   // Build context text from message bodies
-  const parts = messages.map(m => {
-    const role = m.role === 'assistant' ? 'AI' : '用户';
-    const text = (m.message ?? '').replace(/<[^>]+>/g, '').trim();
-    return `[${role}] ${text}`;
-  }).filter(s => s.replace(/\[.*?\]\s*/, '').length > 0);
+  const parts = messages
+    .map(m => {
+      const role = m.role === 'assistant' ? 'AI' : '用户';
+      const text = (m.message ?? '').replace(/<[^>]+>/g, '').trim();
+      return `[${role}] ${text}`;
+    })
+    .filter(s => s.replace(/\[.*?\]\s*/, '').length > 0);
   atContextText.value = parts.join('\n\n');
   atContextTag.value = `楼层 ${floorRange}（${parts.length} 条）`;
   showAtPicker.value = false;
@@ -1020,7 +1029,10 @@ watch(
   cursor: pointer;
   transition: background 0.2s;
 }
-.sys-at-tag-remove:hover { background: rgba(139,69,19,0.3); color: var(--rust); }
+.sys-at-tag-remove:hover {
+  background: rgba(139, 69, 19, 0.3);
+  color: var(--rust);
+}
 
 /* @ picker */
 .sys-at-picker {
@@ -1054,31 +1066,37 @@ watch(
   outline: none;
   font-family: monospace;
 }
-.sys-at-input:focus { border-color: rgba(139,69,19,0.6); }
+.sys-at-input:focus {
+  border-color: rgba(139, 69, 19, 0.6);
+}
 .sys-at-confirm-btn {
   height: 26px;
   padding: 0 10px;
   font-size: 10px;
-  background: rgba(139,69,19,0.2);
-  border: 1px solid rgba(139,69,19,0.4);
+  background: rgba(139, 69, 19, 0.2);
+  border: 1px solid rgba(139, 69, 19, 0.4);
   color: var(--rust);
   border-radius: 3px;
   cursor: pointer;
   transition: background 0.2s;
 }
-.sys-at-confirm-btn:hover { background: rgba(139,69,19,0.35); }
+.sys-at-confirm-btn:hover {
+  background: rgba(139, 69, 19, 0.35);
+}
 .sys-at-cancel-btn {
   height: 26px;
   padding: 0 8px;
   font-size: 10px;
   background: transparent;
-  border: 1px solid rgba(90,79,64,0.3);
+  border: 1px solid rgba(90, 79, 64, 0.3);
   color: var(--vn-muted);
   border-radius: 3px;
   cursor: pointer;
   transition: background 0.2s;
 }
-.sys-at-cancel-btn:hover { background: rgba(90,79,64,0.15); }
+.sys-at-cancel-btn:hover {
+  background: rgba(90, 79, 64, 0.15);
+}
 
 /* @ button */
 .sys-at-btn {
@@ -1087,17 +1105,28 @@ watch(
   justify-content: center;
   width: 30px;
   height: 34px;
-  border: 1px solid rgba(90,79,64,0.4);
-  background: rgba(74,64,53,0.25);
+  border: 1px solid rgba(90, 79, 64, 0.4);
+  background: rgba(74, 64, 53, 0.25);
   color: var(--vn-muted);
   border-radius: 17px;
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
 }
-.sys-at-btn:hover:not(:disabled) { color: var(--stain); border-color: rgba(196,162,101,0.5); background: rgba(196,162,101,0.08); }
-.sys-at-btn-active { color: var(--stain) !important; border-color: rgba(196,162,101,0.5) !important; background: rgba(196,162,101,0.1) !important; }
-.sys-at-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.sys-at-btn:hover:not(:disabled) {
+  color: var(--stain);
+  border-color: rgba(196, 162, 101, 0.5);
+  background: rgba(196, 162, 101, 0.08);
+}
+.sys-at-btn-active {
+  color: var(--stain) !important;
+  border-color: rgba(196, 162, 101, 0.5) !important;
+  background: rgba(196, 162, 101, 0.1) !important;
+}
+.sys-at-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
 
 /* debug eye button */
 .sys-debug-btn {
@@ -1106,21 +1135,24 @@ watch(
   justify-content: center;
   width: 28px;
   height: 34px;
-  border: 1px solid rgba(90,79,64,0.35);
+  border: 1px solid rgba(90, 79, 64, 0.35);
   background: transparent;
-  color: rgba(139,125,107,0.6);
+  color: rgba(139, 125, 107, 0.6);
   border-radius: 17px;
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
 }
-.sys-debug-btn:hover { color: var(--stain); border-color: rgba(196,162,101,0.4); }
+.sys-debug-btn:hover {
+  color: var(--stain);
+  border-color: rgba(196, 162, 101, 0.4);
+}
 
 /* Prompt debug overlay */
 .sys-prompt-debug-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(20,16,12,0.8);
+  background: rgba(20, 16, 12, 0.8);
   z-index: 100;
   display: flex;
   align-items: flex-start;
@@ -1133,8 +1165,8 @@ watch(
   max-height: calc(100% - 24px);
   display: flex;
   flex-direction: column;
-  background: rgba(35,30,26,0.98);
-  border: 1px solid rgba(139,69,19,0.4);
+  background: rgba(35, 30, 26, 0.98);
+  border: 1px solid rgba(139, 69, 19, 0.4);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1143,10 +1175,10 @@ watch(
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(90,79,64,0.3);
+  border-bottom: 1px solid rgba(90, 79, 64, 0.3);
   font-size: 10px;
   font-family: monospace;
-  color: rgba(212,197,160,0.8);
+  color: rgba(212, 197, 160, 0.8);
   letter-spacing: 0.05em;
 }
 .sys-prompt-debug-close {
@@ -1161,7 +1193,9 @@ watch(
   border: none;
   font-size: 0.8rem;
 }
-.sys-prompt-debug-close:hover { color: var(--rust); }
+.sys-prompt-debug-close:hover {
+  color: var(--rust);
+}
 .sys-prompt-debug-body {
   flex: 1;
   overflow-y: auto;
@@ -1175,24 +1209,39 @@ watch(
   overflow: hidden;
   border: 1px solid transparent;
 }
-.sys-prompt-system { border-color: rgba(139,69,19,0.35); background: rgba(139,69,19,0.07); }
-.sys-prompt-user   { border-color: rgba(90,79,64,0.3); background: rgba(74,64,53,0.15); }
-.sys-prompt-assistant { border-color: rgba(90,122,74,0.25); background: rgba(90,122,74,0.06); }
+.sys-prompt-system {
+  border-color: rgba(139, 69, 19, 0.35);
+  background: rgba(139, 69, 19, 0.07);
+}
+.sys-prompt-user {
+  border-color: rgba(90, 79, 64, 0.3);
+  background: rgba(74, 64, 53, 0.15);
+}
+.sys-prompt-assistant {
+  border-color: rgba(90, 122, 74, 0.25);
+  background: rgba(90, 122, 74, 0.06);
+}
 .sys-prompt-role-label {
   font-size: 8px;
   font-family: monospace;
   font-weight: bold;
   letter-spacing: 0.15em;
   padding: 3px 8px;
-  border-bottom: 1px solid rgba(90,79,64,0.2);
+  border-bottom: 1px solid rgba(90, 79, 64, 0.2);
 }
-.sys-prompt-system .sys-prompt-role-label { color: var(--rust); }
-.sys-prompt-user .sys-prompt-role-label { color: var(--stain); }
-.sys-prompt-assistant .sys-prompt-role-label { color: var(--vn-success); }
+.sys-prompt-system .sys-prompt-role-label {
+  color: var(--rust);
+}
+.sys-prompt-user .sys-prompt-role-label {
+  color: var(--stain);
+}
+.sys-prompt-assistant .sys-prompt-role-label {
+  color: var(--vn-success);
+}
 .sys-prompt-content {
   font-size: 10px;
   font-family: 'Noto Serif SC', monospace;
-  color: rgba(212,197,160,0.8);
+  color: rgba(212, 197, 160, 0.8);
   white-space: pre-wrap;
   word-break: break-all;
   padding: 6px 8px;
@@ -1201,10 +1250,10 @@ watch(
 }
 .sys-prompt-debug-footer {
   padding: 6px 12px;
-  border-top: 1px solid rgba(90,79,64,0.2);
+  border-top: 1px solid rgba(90, 79, 64, 0.2);
   font-size: 9px;
   font-family: monospace;
-  color: rgba(139,125,107,0.5);
+  color: rgba(139, 125, 107, 0.5);
   letter-spacing: 0.03em;
 }
 

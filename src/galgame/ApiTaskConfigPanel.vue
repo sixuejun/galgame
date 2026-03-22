@@ -24,7 +24,7 @@
       </div>
 
       <!-- Content -->
-      <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height: calc(85vh - 130px)">
+      <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height: 600px">
         <!-- Task Assignment -->
         <div class="mb-6">
           <div class="text-sm mb-3" style="color: var(--rust); font-weight: bold">功能 API 分配</div>
@@ -58,7 +58,6 @@
             </div>
           </div>
         </div>
-
       </div>
 
       <div :style="decoBottomThin" />
@@ -87,7 +86,7 @@ function updateTaskApi(key: (typeof tasks)[number]['key'], value: 'main' | 'seco
 }
 
 const panelStyle = {
-  maxHeight: '85vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',

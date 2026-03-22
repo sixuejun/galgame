@@ -1,6 +1,6 @@
 // ===== Board Game Types =====
 
-export type NodeType = 'start' | 'empty' | 'encounter' | 'trap' | 'fortune' | 'transfer'
+export type NodeType = 'start' | 'empty' | 'encounter' | 'trap' | 'fortune' | 'transfer' | 'end' | 'end'
 
 export interface MapNode {
   id: string

@@ -1,5 +1,5 @@
 <template>
-  <div class="absolute inset-0 overflow-hidden">
+  <div class="absolute inset-0" style="overflow: hidden; min-height: 0">
     <!-- Layer 1: 背景层 - 大气背景 + 背景图 -->
     <div class="absolute inset-0" style="z-index: 1">
       <!-- 默认大气背景 -->

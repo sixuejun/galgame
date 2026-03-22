@@ -29,6 +29,12 @@ export const useBoardGameStore = defineStore('boardGame', () => {
   const selectedCard = ref<EventCard | null>(null)
   const resolveMessage = ref('')
 
+  // ── AI Event Generation ──────────────────────────────────────
+  const aiEventGenerating = ref(false)
+  const aiEventError = ref<string | null>(null)
+  const aiGeneratedEvent = ref<GameEvent | null>(null)
+  const aiGenerationId = ref<string | null>(null) // Track generation ID for cancellation
+
   // ── Log ──────────────────────────────────────────────────────
   const gameLog = ref<string[]>(['□ 游戏开始，从起点出发。'])
 
@@ -99,26 +105,79 @@ export const useBoardGameStore = defineStore('boardGame', () => {
   function onMoveAnimationDone() {
     isAnimating.value = false
     const node = nodeMap.value.get(currentNodeId.value)
+    
+    // Check if passed through end point (victory condition)
+    if (node && node.type === 'end') {
+      addLog(`★ 到达终点！地图即将刷新...`)
+      setTimeout(() => {
+        regenerateMap(Math.floor(Math.random() * 999999))
+      }, 1500)
+      return
+    }
+    
     if (stepsRemaining.value <= 0) {
-      if (node && node.type !== 'empty' && node.type !== 'start') {
+      // Only trigger event when steps are exhausted (and not on end point)
+      if (node && node.type !== 'empty' && node.type !== 'start' && node.type !== 'end') {
+        // Will trigger event - store node type for potential AI generation
+        currentEventNodeType.value = node.type
         triggerEvent(node)
       } else {
         addLog(`□ 停在空地`)
         phase.value = 'idle'
       }
     } else {
+      // Still have steps remaining, update walkable nodes
       updateWalkable()
     }
   }
+
+  const currentEventNodeType = ref<string | null>(null)
 
   /** choosingPath | idle → event */
   function triggerEvent(node: MapNode) {
     const event = getRandomEvent(node.type)
     if (!event) { phase.value = 'idle'; return }
     currentEvent.value = event
+    aiGeneratedEvent.value = null // Clear any AI generated event
     phase.value = 'event'
     walkableNodeIds.value = []
     addLog(`⚡ 触发事件：${event.title}`)
+  }
+
+  function setAiGeneratedEvent(event: GameEvent) {
+    aiGeneratedEvent.value = event
+    currentEvent.value = event
+  }
+
+  function startAiEventGeneration(generationId: string) {
+    aiEventGenerating.value = true
+    aiEventError.value = null
+    aiGenerationId.value = generationId
+  }
+
+  function finishAiEventGeneration(success: boolean, error?: string) {
+    aiEventGenerating.value = false
+    aiGenerationId.value = null
+    if (!success && error) {
+      aiEventError.value = error
+    }
+  }
+
+  function retryAiEventGeneration() {
+    aiEventError.value = null
+    aiEventGenerating.value = false
+    aiGenerationId.value = null
+  }
+
+  function cancelAiEventGeneration() {
+    // Stop the generation if it's still running
+    if (aiGenerationId.value) {
+      stopGenerationById(aiGenerationId.value)
+    }
+    aiEventGenerating.value = false
+    aiEventError.value = null
+    aiGenerationId.value = null
+    phase.value = 'idle'
   }
 
   /** event → resolving */
@@ -186,9 +245,12 @@ export const useBoardGameStore = defineStore('boardGame', () => {
     phase, seed, mapConfig, currentNodeId, stats,
     diceValue, stepsRemaining, walkableNodeIds, moveHistory, isAnimating, totalSteps,
     currentEvent, selectedCard, resolveMessage,
+    aiEventGenerating, aiEventError, aiGeneratedEvent, aiGenerationId,
+    currentEventNodeType,
     gameLog,
     nodeMap, currentNode, canRoll, canChoose, visitedNodeIds,
     regenerateMap, rollDice, finishRoll, updateWalkable,
     moveToNode, onMoveAnimationDone, triggerEvent, selectCard, finishResolve, resetGame, addLog,
+    setAiGeneratedEvent, startAiEventGeneration, finishAiEventGeneration, retryAiEventGeneration, cancelAiEventGeneration,
   }
 })

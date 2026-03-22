@@ -9,15 +9,18 @@ declare global {
       mainStore: {
         triggerDanmakuForMessage: (message_id: number) => Promise<void>;
         settings: {
+          danmakuEnabled: boolean;
           imageGenEnabled: boolean;
           backgroundGenEnabled: boolean;
           cgGenEnabled: boolean;
+          apiTaskDanmaku: 'main' | 'second' | 'disabled';
           apiTaskImageTag: 'main' | 'second' | 'disabled';
           imageGenPriority: 'cg' | 'background';
         };
         requestBackgroundImage: (prompt: string) => void;
         requestCgImage: (prompt: string) => void;
-        callSecondApi: (task: string, payload: { systemPrompt: string }) => Promise<string[] | string>;
+        pushDanmaku: (text: string) => void;
+        callSecondApi: (task: string, payload: any) => Promise<string[] | string>;
       } | null;
     };
   }
@@ -45,8 +48,7 @@ $(() => {
     if (state.activeGenerationMesId != null) {
       if (message_id !== state.activeGenerationMesId) return;
       state.activeGenerationMesId = null;
-      state.mainStore?.triggerDanmakuForMessage(message_id);
-      triggerImageGenAfterGeneration(message_id, state.mainStore);
+      triggerDanmakuAndImageGen(message_id, state.mainStore);
       return;
     }
     const fallbackMesId = Number($('#chat').children('.mes.last_mes').attr('mesid'));
@@ -55,78 +57,171 @@ $(() => {
     generationEndedDebounceTimer = setTimeout(() => {
       generationEndedDebounceTimer = null;
     }, GENERATION_ENDED_DEBOUNCE_MS);
-    state.mainStore?.triggerDanmakuForMessage(message_id);
-    triggerImageGenAfterGeneration(message_id, state.mainStore);
+    triggerDanmakuAndImageGen(message_id, state.mainStore);
   });
 
-  async function triggerImageGenAfterGeneration(
+  /** 合并弹幕和生图为一次第二API调用 */
+  async function triggerDanmakuAndImageGen(
     message_id: number,
     mainStore: {
       settings: {
+        danmakuEnabled: boolean;
         imageGenEnabled: boolean;
         backgroundGenEnabled: boolean;
         cgGenEnabled: boolean;
+        apiTaskDanmaku: 'main' | 'second' | 'disabled';
         apiTaskImageTag: 'main' | 'second' | 'disabled';
         imageGenPriority: 'cg' | 'background';
       };
       requestBackgroundImage: (p: string) => void;
       requestCgImage: (p: string) => void;
-      callSecondApi: (task: string, payload: { systemPrompt: string }) => Promise<string[] | string>;
+      pushDanmaku: (text: string) => void;
+      callSecondApi: (
+        task: string,
+        payload: { contentText: string },
+      ) => Promise<string[] | string>;
     } | null,
   ) {
-    if (!mainStore?.settings?.imageGenEnabled) return;
+    if (!mainStore) return;
 
     const messages = getChatMessages(message_id);
-    const last = messages?.[0];
-    const rawMessage = last?.message ?? '';
-    const context = rawMessage.trim().slice(0, 500) || 'post-apocalyptic wasteland, newspaper style';
+    const raw = messages[0]?.message ?? '';
+    const contentMatch = raw.match(/<content>([\s\S]*?)<\/content>/);
+    const contentText = contentMatch ? contentMatch[1].trim() : raw.trim();
+    if (!contentText) return;
 
-    // 判断图片类型和插入位置
-    const imageType = determineImageType(rawMessage, mainStore.settings);
-    if (!imageType) return;
+    // 检查是否需要弹幕
+    const needDanmaku = mainStore.settings.danmakuEnabled && mainStore.settings.apiTaskDanmaku === 'second';
 
-    let prompt = context;
-    let secondApiContent = '';
+    // 检查是否需要生图
+    const needImageGen = mainStore.settings.imageGenEnabled && mainStore.settings.apiTaskImageTag === 'second';
 
-    // If using second API for image tag generation
-    if (mainStore.settings.apiTaskImageTag === 'second') {
+    // 如果都不需要，直接返回
+    if (!needDanmaku && !needImageGen) return;
+
+    // 判断图片类型
+    const imageType = needImageGen ? determineImageType(raw, mainStore.settings) : null;
+
+    // 如果需要弹幕但不需要生图，或者需要生图但没有检测到图片类型
+    if (needDanmaku && (!needImageGen || !imageType)) {
+      // 只调用弹幕
       try {
-        const tagPrompt = `根据以下场景描述，生成适合的图片tag（英文，逗号分隔，不超过50词）：\n${context}`;
-        const result = await mainStore.callSecondApi('imageTag', { systemPrompt: tagPrompt });
-        prompt = typeof result === 'string' ? result : context;
-        secondApiContent = prompt;
-        console.info('[ImageGen] Generated tags via second API:', prompt);
+        const lines = (await mainStore.callSecondApi('danmaku', { contentText })) as string[];
+        if (lines.length === 0) return;
+        const minGap = 200;
+        const maxGap = 3000;
+        lines.forEach((text, i) => {
+          const delay = i === 0 ? 0 : minGap + Math.random() * (maxGap - minGap);
+          setTimeout(() => mainStore.pushDanmaku(text), delay);
+        });
       } catch (e) {
-        console.warn('[ImageGen] Failed to generate tags via second API, using context:', e);
-        prompt = context;
+        console.error('[Danmaku] Failed:', e);
       }
+      return;
     }
 
-    // 发送生图请求
-    if (imageType === 'background') {
-      mainStore.requestBackgroundImage(prompt);
-      console.info('[ImageGen] Requesting background image');
-    } else if (imageType === 'cg') {
-      mainStore.requestCgImage(prompt);
-      console.info('[ImageGen] Requesting CG image');
-    } else if (imageType === 'both') {
-      // 两者都存在时，根据用户设置的优先级决定
-      const priority = mainStore.settings.imageGenPriority;
-      if (priority === 'cg') {
-        mainStore.requestCgImage(prompt);
-        console.info('[ImageGen] Both detected, using CG priority');
-      } else {
-        mainStore.requestBackgroundImage(prompt);
-        console.info('[ImageGen] Both detected, using background priority');
+    // 如果只需要生图
+    if (!needDanmaku && needImageGen && imageType) {
+      try {
+        const result = await mainStore.callSecondApi('imageTag', {
+          contentText,
+        });
+        const prompt = typeof result === 'string' ? result : contentText;
+        console.info('[ImageGen] Generated tags via second API:', prompt);
+
+        // 发送生图请求
+        if (imageType === 'background') {
+          mainStore.requestBackgroundImage(prompt);
+        } else if (imageType === 'cg') {
+          mainStore.requestCgImage(prompt);
+        } else if (imageType === 'both') {
+          const priority = mainStore.settings.imageGenPriority;
+          if (priority === 'cg') {
+            mainStore.requestCgImage(prompt);
+          } else {
+            mainStore.requestBackgroundImage(prompt);
+          }
+        }
+
+        // 将第二API内容写入消息末尾
+        const marker = `\n<!-- 第二API生图tag: ${prompt} -->`;
+        const updatedMessage = messages[0].message + marker;
+        await setChatMessages([{ ...messages[0], message: updatedMessage }], messages[0].id);
+      } catch (e) {
+        console.error('[ImageGen] Failed:', e);
       }
+      return;
     }
 
-    // 将第二API内容写入消息末尾
-    if (secondApiContent && last) {
-      const marker = `\n<!-- 第二API生图tag: ${secondApiContent} -->`;
-      const updatedMessage = last.message + marker;
-      await setChatMessages([{ ...last, message: updatedMessage }], last.id);
-      console.info('[ImageGen] Inserted second API content to message end');
+    // 如果两者都需要，合并调用
+    if (needDanmaku && needImageGen && imageType) {
+      try {
+        // 合并调用，同时生成弹幕和生图标签
+        const result = (await mainStore.callSecondApi('danmakuAndImageGen', {
+          contentText,
+        })) as string;
+
+        console.info('[DanmakuAndImageGen] Raw result:', result);
+
+        // 解析结果（由用户在预设中定义格式，这里提供一个默认解析逻辑）
+        // 假设格式为：弹幕行在前，最后一行是生图标签（以特殊标记开头，如 "IMAGE_TAG:"）
+        const lines = result
+          .split(/\n/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        const danmakuLines: string[] = [];
+        let imageTag = '';
+
+        for (const line of lines) {
+          if (line.startsWith('IMAGE_TAG:') || line.startsWith('生图标签:')) {
+            imageTag = line.replace(/^(IMAGE_TAG:|生图标签:)\s*/, '');
+          } else {
+            danmakuLines.push(line);
+          }
+        }
+
+        // 如果没有找到特殊标记，则最后一行作为生图标签，其余作为弹幕
+        if (!imageTag && lines.length > 0) {
+          imageTag = lines[lines.length - 1];
+          danmakuLines.length = 0;
+          danmakuLines.push(...lines.slice(0, -1));
+        }
+
+        // 处理弹幕
+        if (danmakuLines.length > 0) {
+          const minGap = 200;
+          const maxGap = 3000;
+          danmakuLines.forEach((text, i) => {
+            const delay = i === 0 ? 0 : minGap + Math.random() * (maxGap - minGap);
+            setTimeout(() => mainStore.pushDanmaku(text), delay);
+          });
+        }
+
+        // 处理生图
+        if (imageTag) {
+          console.info('[ImageGen] Generated tags via second API:', imageTag);
+
+          if (imageType === 'background') {
+            mainStore.requestBackgroundImage(imageTag);
+          } else if (imageType === 'cg') {
+            mainStore.requestCgImage(imageTag);
+          } else if (imageType === 'both') {
+            const priority = mainStore.settings.imageGenPriority;
+            if (priority === 'cg') {
+              mainStore.requestCgImage(imageTag);
+            } else {
+              mainStore.requestBackgroundImage(imageTag);
+            }
+          }
+
+          // 将第二API内容写入消息末尾
+          const marker = `\n<!-- 第二API生成: 弹幕${danmakuLines.length}条, 生图tag: ${imageTag} -->`;
+          const updatedMessage = messages[0].message + marker;
+          await setChatMessages([{ ...messages[0], message: updatedMessage }], messages[0].id);
+        }
+      } catch (e) {
+        console.error('[DanmakuAndImageGen] Failed:', e);
+      }
     }
   }
 

@@ -83,7 +83,7 @@ export interface RiddleRecord {
 }
 
 export type OverlayPanel = 'none' | 'settings' | 'history' | 'character' | 'gameplay';
-export type ProviderStatus = 'available' | 'disabled';
+export type ProviderStatus = 'available' | 'degraded' | 'disabled';
 
 export interface SystemPersonality {
   id: string;
@@ -102,7 +102,7 @@ export interface SystemChatMessage {
 
 export interface SecondApiGeneration {
   id: string;
-  type: 'danmaku' | 'imageTag' | 'variable';
+  type: 'danmaku' | 'imageTag' | 'variable' | 'boardGameEvent';
   content: string;
   timestamp: number;
   messageId: number;
@@ -146,8 +146,6 @@ const VNSettings = z
     danmakuSpeed: z.number().min(1).max(10).default(5),
     danmakuLoop: z.boolean().default(false),
     danmakuDisplay: z.enum(['full', 'half', 'third']).default('third'),
-    danmakuSendChatHistory: z.boolean().default(false),
-    danmakuChatHistoryDepth: z.number().min(1).max(500).default(10),
     secondApiUrl: z.string().default(''),
     secondApiKey: z.string().default(''),
     secondApiModel: z.string().default(''),
@@ -167,6 +165,9 @@ const VNSettings = z
     apiTaskDanmaku: z.enum(['main', 'second', 'disabled']).default('second'),
     apiTaskImageTag: z.enum(['main', 'second', 'disabled']).default('second'),
     apiTaskVariable: z.enum(['main', 'second', 'disabled']).default('main'),
+    // Board game settings
+    boardGameEventGenEnabled: z.boolean().default(false),
+    boardGameEventSendMode: z.enum(['direct', 'choice']).default('choice'),
   })
   .prefault({});
 
@@ -197,14 +198,25 @@ export type ImageGenResponseData = {
 
 type DanmakuPayload = {
   contentText: string;
-  chatHistory?: { role: 'system' | 'assistant' | 'user'; content: string }[];
 };
-type ShopPayload = { systemPrompt: string };
-type SystemPayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+type ShopPayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
+type SystemPayload = {
+  ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[];
+  injects?: { depth: number; role: 'system' | 'assistant' | 'user'; content: string }[];
+};
 type RiddlePayload = { ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] };
-type ImageTagPayload = { systemPrompt: string };
+type ImageTagPayload = { contentText: string };
+type BoardGameEventPayload = {
+  contentText: string;
+};
 
-type SecondApiPayload = DanmakuPayload | ShopPayload | SystemPayload | RiddlePayload | ImageTagPayload;
+type SecondApiPayload =
+  | DanmakuPayload
+  | ShopPayload
+  | SystemPayload
+  | RiddlePayload
+  | ImageTagPayload
+  | BoardGameEventPayload;
 
 const VNGameData = z
   .object({
@@ -623,13 +635,27 @@ export const useVNStore = defineStore('vn', () => {
   const selectedChoiceId = ref<string | null>(null);
   const choiceLocked = ref(false);
   const customInputText = ref('');
+  const tempOptions = ref<Choice[]>([]); // Temporary options from board game events
   const toastMessage = ref<string | null>(null);
   const toastVisible = ref(false);
 
-  // --- Persisted settings ---
-  const settings = ref(VNSettings.parse(getVariables({ type: 'script', script_id: getScriptId() })));
+  // --- Persisted settings (localStorage, key固定避免流式楼层iframe id不一致) ---
+  function loadSettingsFromStorage(): z.infer<typeof VNSettings> {
+    try {
+      const raw = localStorage.getItem('vn_galgame_settings');
+      if (raw) return VNSettings.parse(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+    return VNSettings.parse({});
+  }
+  const settings = ref(loadSettingsFromStorage());
   watchEffect(() => {
-    replaceVariables(klona(settings.value), { type: 'script', script_id: getScriptId() });
+    try {
+      localStorage.setItem('vn_galgame_settings', JSON.stringify(klona(settings.value)));
+    } catch {
+      /* ignore */
+    }
   });
 
   // --- Persisted game data ---
@@ -693,6 +719,36 @@ export const useVNStore = defineStore('vn', () => {
     insertOrAssignVariables(
       {
         vn_second_api_generations: klona(secondApiGenerations.value),
+      },
+      { type: 'chat' },
+    );
+  });
+
+  // --- Second API Task Control Variables (MVU) ---
+  // 用于在调用第二API前临时控制哪些提示词生效
+  const secondApiTaskControl = ref({
+    danmaku: false,
+    imageGen: false,
+    shop: false,
+    riddle: false,
+    system: false,
+  });
+
+  // --- Second API Error Tracking ---
+  const secondApiLastErrorType = ref<'timeout' | 'network' | null>(null);
+  const secondApiConsecutiveFailures = ref(0);
+  const secondApiStatusOverride = ref<ProviderStatus>('available');
+  const SECOND_API_DEGRADED_THRESHOLD = 3;
+
+  // 同步到聊天变量，供 EJS 使用
+  watchEffect(() => {
+    insertOrAssignVariables(
+      {
+        vn_task_danmaku: secondApiTaskControl.value.danmaku,
+        vn_task_imageGen: secondApiTaskControl.value.imageGen,
+        vn_task_shop: secondApiTaskControl.value.shop,
+        vn_task_riddle: secondApiTaskControl.value.riddle,
+        vn_task_system: secondApiTaskControl.value.system,
       },
       { type: 'chat' },
     );
@@ -764,6 +820,8 @@ export const useVNStore = defineStore('vn', () => {
   // --- API Provider status (available | degraded | disabled) ---
   const secondApiStatus = computed<ProviderStatus>(() => {
     if (!settings.value.secondApiUrl || !settings.value.secondApiKey) return 'disabled';
+    if (secondApiStatusOverride.value === 'degraded') return 'degraded';
+    if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD) return 'degraded';
     return 'available';
   });
   const imageApiStatus = computed<ProviderStatus>(() =>
@@ -821,6 +879,7 @@ export const useVNStore = defineStore('vn', () => {
   async function testSecondApiConnection(): Promise<boolean> {
     const url = settings.value.secondApiUrl?.trim();
     const key = settings.value.secondApiKey?.trim();
+    const model = settings.value.secondApiModel?.trim() || 'gpt-3.5-turbo';
 
     if (!url || !key) {
       showToast('请先填写接口地址与 API 密钥');
@@ -829,28 +888,46 @@ export const useVNStore = defineStore('vn', () => {
 
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const timer = setTimeout(() => ctrl.abort(), 15000);
 
-      const res = await fetch(`${url.replace(/\/$/, '')}/models`, {
-        method: 'GET',
+      const res = await fetch(`${url.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: '你好' }],
+          max_tokens: 20,
+          stream: false,
+        }),
         signal: ctrl.signal,
       });
 
       clearTimeout(timer);
 
-      if (res.ok) {
-        showToast('连接成功，密钥可用 ✓');
-        return true;
-      } else {
+      if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
         showToast(`连接失败：${res.status} ${text}`);
         return false;
       }
+
+      const body = await res.json().catch(() => null);
+      const reply = body?.choices?.[0]?.message?.content?.trim();
+      if (!reply) {
+        showToast('连接成功但收到空回复，请检查模型名称是否正确');
+        return false;
+      }
+
+      showToast(`连接成功，模型 ${model} 可用 ✓`);
+      return true;
     } catch (e: any) {
-      showToast(`网络错误：${e.message || '无法到达服务器'}`);
+      if (e.name === 'AbortError') {
+        showToast('连接超时，请检查 API 地址是否正确');
+      } else {
+        showToast(`网络错误：${e.message || '无法到达服务器'}`);
+      }
       return false;
     }
   }
@@ -942,17 +1019,17 @@ export const useVNStore = defineStore('vn', () => {
 
   // --- Second API unified entry ---
   async function callSecondApi(
-    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'imageTag',
+    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'imageTag' | 'danmakuAndImageGen',
     payload: SecondApiPayload,
   ): Promise<string[] | ShopItem[] | string> {
     const url = settings.value.secondApiUrl?.trim();
     const key = settings.value.secondApiKey?.trim();
     if (!url || !key) {
       showToast('第二 API 未配置');
-      return task === 'shop' ? [] : task === 'danmaku' ? [] : '';
+      return task === 'shop' ? [] : task === 'danmaku' || task === 'danmakuAndImageGen' ? [] : '';
     }
     const model = settings.value.secondApiModel?.trim() || 'gpt-3.5-turbo';
-    
+
     // 如果设置了预设，先加载预设
     const presetName = settings.value.secondApiPreset?.trim();
     let currentPreset: string | null = null;
@@ -968,6 +1045,35 @@ export const useVNStore = defineStore('vn', () => {
       }
     }
 
+    // 设置任务控制变量（在发送前临时修改）
+    const taskControlBackup = { ...secondApiTaskControl.value };
+
+    // 重置所有任务开关为 false
+    Object.keys(secondApiTaskControl.value).forEach(key => {
+      secondApiTaskControl.value[key as keyof typeof secondApiTaskControl.value] = false;
+    });
+
+    // 只开启当前任务对应的开关
+    if (task === 'danmaku') {
+      secondApiTaskControl.value.danmaku = true;
+    } else if (task === 'imageTag') {
+      secondApiTaskControl.value.imageGen = true;
+    } else if (task === 'shop') {
+      secondApiTaskControl.value.shop = true;
+    } else if (task === 'riddle') {
+      secondApiTaskControl.value.riddle = true;
+    } else if (task === 'system') {
+      secondApiTaskControl.value.system = true;
+    } else if (task === 'danmakuAndImageGen') {
+      // 弹幕和生图合并调用，同时开启两个开关
+      secondApiTaskControl.value.danmaku = true;
+      secondApiTaskControl.value.imageGen = true;
+    }
+
+    // 等待变量同步（watchEffect 是异步的，需要等待下一个 tick）
+    await nextTick();
+    console.info(`[SecondAPI] 任务控制变量已设置:`, secondApiTaskControl.value);
+
     const custom_api = {
       apiurl: url,
       key,
@@ -978,23 +1084,27 @@ export const useVNStore = defineStore('vn', () => {
       top_p: settings.value.secondApiTopP === 'unset' ? undefined : settings.value.secondApiTopP,
       top_k: settings.value.secondApiTopK === 'unset' ? undefined : settings.value.secondApiTopK,
     };
+
+    // 构建 ordered_prompts，不再硬编码提示词，完全依赖预设中的 EJS
     const danmakuPayload = payload as DanmakuPayload;
+    const systemPayload = payload as SystemPayload;
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] =
-      task === 'danmaku'
-        ? [
-            { role: 'system', content: '你只输出多条弹幕文案，每行一条，不要编号、不要其他说明。' },
-            ...(danmakuPayload.chatHistory ?? []),
-            { role: 'user', content: danmakuPayload.contentText },
-          ]
-        : task === 'shop'
-          ? [{ role: 'user', content: (payload as ShopPayload).systemPrompt }]
-          : task === 'imageTag'
-            ? [{ role: 'user', content: (payload as ImageTagPayload).systemPrompt }]
-            : (payload as SystemPayload | RiddlePayload).ordered_prompts;
+      task === 'danmaku' || task === 'danmakuAndImageGen'
+        ? [{ role: 'user', content: danmakuPayload.contentText }]
+        : (payload as SystemPayload | RiddlePayload).ordered_prompts || [];
+
+    // 提取 injects（仅 system 任务支持）
+    const injects =
+      task === 'system'
+        ? systemPayload.injects?.map(inject => ({
+            ...inject,
+            position: 'absolute' as const,
+          }))
+        : undefined;
 
     const doRequest = (): Promise<string> =>
       Promise.race([
-        generateRaw({ custom_api, should_stream: false, should_silence: true, ordered_prompts }),
+        generateRaw({ custom_api, should_stream: false, should_silence: true, ordered_prompts, injects }),
         new Promise<never>((_, reject) =>
           setTimeout(() => {
             secondApiLastErrorType.value = 'timeout';
@@ -1009,41 +1119,49 @@ export const useVNStore = defineStore('vn', () => {
           const raw = await doRequest();
           secondApiConsecutiveFailures.value = 0;
           secondApiStatusOverride.value = 'available';
-        if (task === 'danmaku') {
-          const lines = raw
-            .split(/\n/)
-            .map(s => s.trim())
-            .filter(Boolean);
-          return lines;
-        }
-        if (task === 'shop') {
-          const items: ShopItem[] = [];
-          const lineRegex = /^(.+?)\s*[|｜]\s*(.+?)\s*[|｜]\s*(\d+)\s*$/;
-          for (const line of raw
-            .split(/\n/)
-            .map(s => s.trim())
-            .filter(Boolean)) {
-            const m = line.match(lineRegex);
-            if (m) items.push({ id: `s${Date.now()}_${items.length}`, name: m[1], effect: m[2], price: Number(m[3]) });
+
+          // 弹幕和生图合并调用的解析
+          if (task === 'danmakuAndImageGen') {
+            // 返回原始字符串，由调用方自行解析弹幕和生图标签
+            return raw;
           }
-          if (items.length === 0) {
-            try {
-              const parsed = JSON.parse(raw) as { name?: string; effect?: string; price?: number }[];
-              if (Array.isArray(parsed))
-                parsed.forEach((p, i) =>
-                  items.push({
-                    id: `s${Date.now()}_${i}`,
-                    name: p.name ?? '',
-                    effect: p.effect ?? '',
-                    price: Number(p.price) || 0,
-                  }),
-                );
-            } catch {
-              /* ignore */
+
+          if (task === 'danmaku') {
+            const lines = raw
+              .split(/\n/)
+              .map(s => s.trim())
+              .filter(Boolean);
+            return lines;
+          }
+          if (task === 'shop') {
+            const items: ShopItem[] = [];
+            const lineRegex = /^(.+?)\s*[|｜]\s*(.+?)\s*[|｜]\s*(\d+)\s*$/;
+            for (const line of raw
+              .split(/\n/)
+              .map(s => s.trim())
+              .filter(Boolean)) {
+              const m = line.match(lineRegex);
+              if (m)
+                items.push({ id: `s${Date.now()}_${items.length}`, name: m[1], effect: m[2], price: Number(m[3]) });
             }
+            if (items.length === 0) {
+              try {
+                const parsed = JSON.parse(raw) as { name?: string; effect?: string; price?: number }[];
+                if (Array.isArray(parsed))
+                  parsed.forEach((p, i) =>
+                    items.push({
+                      id: `s${Date.now()}_${i}`,
+                      name: p.name ?? '',
+                      effect: p.effect ?? '',
+                      price: Number(p.price) || 0,
+                    }),
+                  );
+              } catch {
+                /* ignore */
+              }
+            }
+            return items;
           }
-          return items;
-        }
           return raw;
         } catch {
           secondApiConsecutiveFailures.value++;
@@ -1055,6 +1173,11 @@ export const useVNStore = defineStore('vn', () => {
       if (task === 'shop') return [];
       return '';
     } finally {
+      // 恢复任务控制变量
+      Object.assign(secondApiTaskControl.value, taskControlBackup);
+      await nextTick();
+      console.info(`[SecondAPI] 任务控制变量已恢复:`, secondApiTaskControl.value);
+
       // 恢复原预设
       if (currentPreset && presetName) {
         try {
@@ -1083,19 +1206,8 @@ export const useVNStore = defineStore('vn', () => {
     const contentMatch = raw.match(/<content>([\s\S]*?)<\/content>/);
     const contentText = contentMatch ? contentMatch[1].trim() : raw.trim();
     if (!contentText) return;
-    let chatHistory: { role: 'system' | 'assistant' | 'user'; content: string }[] | undefined;
-    if (settings.value.danmakuSendChatHistory && message_id > 0) {
-      const depth = settings.value.danmakuChatHistoryDepth;
-      const startId = Math.max(0, message_id - depth);
-      const prev = getChatMessages(`${startId}-${message_id - 1}`);
-      chatHistory = prev.flatMap(m => {
-        const role = m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user';
-        const text = (m.message ?? '').replace(/<content>[\s\S]*?<\/content>/g, '').trim();
-        return text ? [{ role, content: text }] : [];
-      });
-    }
     try {
-      const lines = (await callSecondApi('danmaku', { contentText, chatHistory })) as string[];
+      const lines = (await callSecondApi('danmaku', { contentText })) as string[];
       if (lines.length === 0) return;
       const minGap = 200;
       const maxGap = 3000;
@@ -1109,15 +1221,11 @@ export const useVNStore = defineStore('vn', () => {
   }
 
   /** Unified API task executor - routes to main or second API based on config */
-  async function callApiForTask(
-    task: 'danmaku' | 'imageTag' | 'variable',
-    prompt: string,
-  ): Promise<string> {
+  async function callApiForTask(task: 'danmaku' | 'imageTag', prompt: string): Promise<string> {
     let apiType: 'main' | 'second' | 'disabled' = 'disabled';
 
     if (task === 'danmaku') apiType = settings.value.apiTaskDanmaku;
     else if (task === 'imageTag') apiType = settings.value.apiTaskImageTag;
-    else if (task === 'variable') apiType = settings.value.apiTaskVariable;
 
     if (apiType === 'disabled') return '';
 
@@ -1133,7 +1241,7 @@ export const useVNStore = defineStore('vn', () => {
 
   /** Wrapper for callSecondApi that tracks generations and inserts to message */
   async function callSecondApiWithTracking(
-    task: 'danmaku' | 'imageTag' | 'variable',
+    task: 'danmaku' | 'imageTag',
     payload: { systemPrompt: string },
   ): Promise<string> {
     const result = await callSecondApi(task, payload);
@@ -1175,9 +1283,9 @@ export const useVNStore = defineStore('vn', () => {
     const marker = `\n<!-- 第二API生成(${gen.type}): ${gen.content} -->`;
     const updatedMessage = lastMessage.message + marker;
 
-    await setChatMessages([{ ...lastMessage, message: updatedMessage }], lastMessage.id);
+    await setChatMessages([{ message_id: lastMessage.message_id, message: updatedMessage }]);
 
-    gen.messageId = lastMessage.id;
+    gen.messageId = lastMessage.message_id;
     gen.inserted = true;
   }
 
@@ -1660,12 +1768,9 @@ export const useVNStore = defineStore('vn', () => {
     riddleStartTime.value = null;
   }
 
-  const RIDDLE_SYSTEM_PROMPT = `你正在和用户玩猜谜。用户会给你提示，你需要根据提示猜测一个词（谜底）。你只能回复你的猜测或请求更多提示，不要重复用户的提示。若你猜中了谜底，在回复中自然地说出答案即可。`;
-
   async function requestRiddleAiReply(): Promise<{ won: boolean; reward: number }> {
     const hist = riddleChatHistory.value;
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
-      { role: 'system', content: RIDDLE_SYSTEM_PROMPT },
       ...hist.map(m => ({ role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant', content: m.text })),
     ];
     const raw = (await callSecondApi('riddle', { ordered_prompts })) as string;
@@ -1678,11 +1783,6 @@ export const useVNStore = defineStore('vn', () => {
   const shopItems = ref<ShopItem[]>([]);
   const shopRefreshing = ref(false);
   const shopGenerationId = ref(0);
-
-  const SHOP_SYSTEM_PROMPT = `你是一个末日风格小店的商品生成器。只输出商品列表，每行格式：商品名|效果描述|价格（整数）。例如：
-破旧绷带|恢复少量生命|30
-生锈罐头|恢复饱食度|50
-输出 4 条，价格在 20–150 之间。`;
 
   async function refreshShop() {
     if (secondApiStatus.value === 'disabled') {
@@ -1699,7 +1799,7 @@ export const useVNStore = defineStore('vn', () => {
     shopGenerationId.value++;
     const genId = shopGenerationId.value;
     try {
-      const result = await callSecondApi('shop', { systemPrompt: SHOP_SYSTEM_PROMPT });
+      const result = await callSecondApi('shop', { ordered_prompts: [] });
       if (genId !== shopGenerationId.value) return;
       shopItems.value = result as ShopItem[];
       if (shopItems.value.length === 0) {
@@ -1775,26 +1875,40 @@ export const useVNStore = defineStore('vn', () => {
     const personality = SYSTEM_PERSONALITIES.find(p => p.id === personalityId);
     const systemPrompt = personality?.systemPrompt ?? '你是一个助手。';
 
-    // Build ordered_prompts: System -> History -> Context -> User Input
+    // Build ordered_prompts: System -> History -> User Input
     const historyPrompts = hist
       .slice(0, -1) // exclude the user message we just pushed (will be added at end)
       .map(m => ({ role: m.role === 'proactive' ? 'assistant' : m.role, content: m.text }));
-    const contextPrompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = options?.context
-      ? [
-          { role: 'user', content: `[剧情参考]\n${options.context}` },
-          { role: 'assistant', content: '好的，我已了解相关剧情内容。' },
-        ]
-      : [];
+
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
       { role: 'system', content: systemPrompt },
       ...historyPrompts,
-      ...contextPrompts,
       { role: 'user', content: userText },
     ];
+
+    // Build injects for context (剧情引用)
+    const injects: { depth: number; role: 'system' | 'assistant' | 'user'; content: string }[] | undefined =
+      options?.context
+        ? [
+            { depth: 2, role: 'user', content: `[剧情参考]\n${options.context}` },
+            { depth: 1, role: 'assistant', content: '好的，我已了解相关剧情内容。' },
+          ]
+        : undefined;
+
     lastSystemPrompts.value = ordered_prompts;
     try {
-      const reply = (await callSecondApi('system', { ordered_prompts })) as string;
-      hist.push({ role: 'assistant', text: reply || '(无回复)' });
+      const reply = (await callSecondApi('system', { ordered_prompts, injects })) as string;
+      if (!reply) {
+        const model = settings.value.secondApiModel?.trim();
+        if (!model) {
+          showToast('第二 API 返回空回复：未选择模型，请在设置中拉取并选择模型');
+        } else {
+          showToast(`第二 API 返回空回复：请检查模型「${model}」是否可用`);
+        }
+        hist.push({ role: 'assistant', text: '(无回复，请检查第二 API 配置)' });
+        return '';
+      }
+      hist.push({ role: 'assistant', text: reply });
       if (activePersonalityId.value !== personalityId) {
         unreadPersonalityIds.value.add(personalityId);
       }
@@ -1848,10 +1962,15 @@ export const useVNStore = defineStore('vn', () => {
   function lockChoice() {
     choiceLocked.value = true;
   }
+
+  function setTempOptions(options: Choice[]) {
+    tempOptions.value = options;
+  }
   function clearChoices() {
     selectedChoiceId.value = null;
     choiceLocked.value = false;
     customInputText.value = '';
+    tempOptions.value = []; // Clear temp options when clearing choices
   }
 
   function updateSettings(partial: Partial<z.infer<typeof VNSettings>>) {
@@ -1995,6 +2114,8 @@ export const useVNStore = defineStore('vn', () => {
     selectChoice,
     lockChoice,
     clearChoices,
+    setTempOptions,
+    tempOptions,
     updateSettings,
     updateUserCharacter,
     showToast,

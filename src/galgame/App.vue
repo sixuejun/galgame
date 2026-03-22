@@ -1,20 +1,20 @@
 <template>
   <main
     ref="mainEl"
-    class="relative w-full overflow-hidden select-none"
-    :style="{ background: 'var(--vn-bg)', aspectRatio: '16/9' }"
+    class="relative w-full select-none"
+    :style="{ background: 'var(--vn-bg)', aspectRatio: '16/9', minHeight: '0' }"
   >
     <StageArea />
 
     <!-- Image Deck (扇形卡牌队列) -->
     <ImageDeck v-if="showImageDeck" />
 
-    <div class="pointer-events-none absolute inset-0 flex flex-col" style="z-index: 20">
-      <div class="pointer-events-auto">
+    <div class="pointer-events-none absolute inset-0 flex flex-col" style="z-index: 20; min-height: 0">
+      <div class="pointer-events-auto flex-shrink-0">
         <QuickAccessMenu :is-fullscreen="isFullscreen" @toggle-fullscreen="toggleFullscreen" />
       </div>
-      <div class="flex-1" />
-      <div class="pointer-events-auto pb-6 md:pb-8">
+      <div class="flex-1 min-h-0" />
+      <div class="pointer-events-auto pb-6 md:pb-8 flex-shrink-0">
         <DialogueBox :choices="choices" :during-streaming="context.during_streaming" />
       </div>
     </div>

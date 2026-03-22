@@ -84,7 +84,7 @@
         <!-- Module content -->
         <div
           class="overflow-y-auto no-scrollbar"
-          style="max-height: calc(80vh - 60px)"
+          style="max-height: 600px"
         >
           <ShopModule v-if="moduleId === 'shop'" />
           <WorkshopModule v-else-if="moduleId === 'idle_workshop'" />
@@ -161,14 +161,14 @@ const resolvedMod = computed(() => {
 });
 
 const panelStyle = {
-  maxHeight: '80vh',
+  maxHeight: '700px',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
 };
 
 const puzzle2048Panel = {
-  maxHeight: '90vh',
+  maxHeight: '700px',
   maxWidth: '28rem',
   width: '100%',
   borderColor: 'var(--vn-border)',
@@ -177,7 +177,7 @@ const puzzle2048Panel = {
 };
 
 const boardGamePanel = {
-  maxHeight: '90vh',
+  maxHeight: '700px',
   maxWidth: '900px',
   width: '100%',
   borderColor: 'rgba(90,79,64,0.6)',
