@@ -1,6 +1,6 @@
 import { klona } from 'klona';
 import type { MessageBlock } from './types/message';
-import { parseMessageBlocks } from './utils/messageParser';
+import { parseMessageBlocks, extractContentTag, extractPlainTextFromContent } from './utils/messageParser';
 import { clearResourceCache } from './utils/worldbookLoader';
 
 // ====== Types ======
@@ -96,7 +96,7 @@ export interface SystemPersonality {
 }
 
 export interface SystemChatMessage {
-  role: 'user' | 'assistant' | 'proactive';
+  role: 'user' | 'assistant' | 'proactive' | 'divider' | 'riddle_divider' | 'riddle_start' | 'riddle_end_pending' | 'riddle_end';
   text: string;
 }
 
@@ -151,8 +151,8 @@ const VNSettings = z
     secondApiModel: z.string().default(''),
     secondApiPreset: z.string().default(''),
     secondApiStream: z.boolean().default(false),
-    secondApiTemperature: z.union([z.number(), z.literal('unset')]).default('unset'),
-    secondApiMaxTokens: z.union([z.number(), z.literal('unset')]).default('unset'),
+    secondApiTemperature: z.union([z.number(), z.literal('unset')]).default(1.0),
+    secondApiMaxTokens: z.union([z.number(), z.literal('unset')]).default(6200),
     secondApiTopP: z.union([z.number(), z.literal('unset')]).default('unset'),
     secondApiTopK: z.union([z.number(), z.literal('unset')]).default('unset'),
     imageApiUrl: z.string().default(''),
@@ -358,7 +358,7 @@ const SYSTEM_PERSONALITIES: SystemPersonality[] = [
       workshop_idle_long: ['工坊已停止运作超过预定时间。建议恢复生产以最大化收益。'],
       workshop_upgrade: ['工坊等级提升确认。生产效率已优化。'],
       gold_windfall: ['检测到大额资金流入。建议合理分配资源。'],
-      riddle_solved: ['谜题已破解。智力水平评估：优秀。'],
+      riddle_solved: ['谜题已破解。你可以为我感到骄傲。'],
     },
   },
   {
@@ -371,20 +371,20 @@ const SYSTEM_PERSONALITIES: SystemPersonality[] = [
       workshop_idle_long: ['工坊都在打呼噜了，老板你也太佛系了吧？'],
       workshop_upgrade: ['哇哦，工坊升级啦！看来我们要发财了！'],
       gold_windfall: ['发财了发财了！见者有份吗？'],
-      riddle_solved: ['脑子转得挺快嘛！不愧是我看中的人。'],
+      riddle_solved: ['真有意思的谜题，不愧是我看中的人。'],
     },
   },
   {
     id: 'sys_lively',
     name: '啾啾',
     avatarChar: '啾',
-    systemPrompt: '你是一个活泼、元气满满的系统助手。你总是充满活力，使用大量的感叹号和表情符号。',
+    systemPrompt: '你是一个活泼、元气满满的系统助手。你总是充满活力，使用大量的可爱表情和符号。',
     proactiveLines: {
       stock_bankruptcy: ['呜呜呜，钱钱不见了！不要灰心，我们重新开始！'],
       workshop_idle_long: ['老板老板！工坊休息好久啦，快让它动起来吧！'],
       workshop_upgrade: ['好耶！工坊变得更厉害了！冲鸭！'],
       gold_windfall: ['好多金币！亮闪闪的！太棒了！'],
-      riddle_solved: ['太厉害了！你简直是天才！'],
+      riddle_solved: ['太棒了！我们简直心有灵犀！'],
     },
   },
   {
@@ -397,7 +397,7 @@ const SYSTEM_PERSONALITIES: SystemPersonality[] = [
       workshop_idle_long: ['你是打算让工坊生锈吗？还不快去干活。'],
       workshop_upgrade: ['勉强升级了？别以为这样就能偷懒了。'],
       gold_windfall: ['走了狗屎运吗？别得意忘形，很快就会花光的。'],
-      riddle_solved: ['居然猜对了？看来你的脑子还没完全生锈。'],
+      riddle_solved: ['居然猜对了？看来我还是很厉害的嘛。'],
     },
   },
 ];
@@ -725,13 +725,12 @@ export const useVNStore = defineStore('vn', () => {
   });
 
   // --- Second API Task Control Variables (MVU) ---
-  // 用于在调用第二API前临时控制哪些提示词生效
+  // 用于在调用第二API前临时控制哪些提示词生效（仅预设任务需要）
   const secondApiTaskControl = ref({
     danmaku: false,
     imageGen: false,
     shop: false,
-    riddle: false,
-    system: false,
+    // riddle 和 system 任务不使用预设，无需任务控制变量
   });
 
   // --- Second API Error Tracking ---
@@ -740,15 +739,14 @@ export const useVNStore = defineStore('vn', () => {
   const secondApiStatusOverride = ref<ProviderStatus>('available');
   const SECOND_API_DEGRADED_THRESHOLD = 3;
 
-  // 同步到聊天变量，供 EJS 使用
+  // 同步到聊天变量，供 EJS 使用（仅预设任务需要）
   watchEffect(() => {
     insertOrAssignVariables(
       {
         vn_task_danmaku: secondApiTaskControl.value.danmaku,
         vn_task_imageGen: secondApiTaskControl.value.imageGen,
         vn_task_shop: secondApiTaskControl.value.shop,
-        vn_task_riddle: secondApiTaskControl.value.riddle,
-        vn_task_system: secondApiTaskControl.value.system,
+        // riddle 和 system 任务不使用预设，无需同步变量
       },
       { type: 'chat' },
     );
@@ -774,6 +772,13 @@ export const useVNStore = defineStore('vn', () => {
           currentScene.value = blocks[i].scene!;
           break;
         }
+      }
+
+      // 提取剧情纯文本并同步到酒馆变量，供 {{getvar::剧情文本}} 使用
+      const plainText = extractPlainTextFromContent(message);
+      if (plainText) {
+        insertOrAssignVariables({ '剧情文本': plainText }, { type: 'chat' });
+        console.info('[剧情文本] 已更新剧情文本变量');
       }
 
       console.info('[消息解析] 解析完成，共', blocks.length, '个块');
@@ -829,8 +834,26 @@ export const useVNStore = defineStore('vn', () => {
   );
 
   // --- Second API Model List ---
-  const secondApiModelList = ref<string[]>([]);
+  const secondApiModelList = ref<string[]>(
+    (() => {
+      try {
+        const cached = localStorage.getItem('vn_galgame_model_list');
+        if (cached) return JSON.parse(cached) as string[];
+      } catch {
+        /* ignore */
+      }
+      return [];
+    })(),
+  );
   const secondApiModelListLoading = ref(false);
+
+  watchEffect(() => {
+    try {
+      localStorage.setItem('vn_galgame_model_list', JSON.stringify(secondApiModelList.value));
+    } catch {
+      /* ignore */
+    }
+  });
 
   async function fetchSecondApiModelList(): Promise<void> {
     const url = settings.value.secondApiUrl?.trim();
@@ -1030,10 +1053,20 @@ export const useVNStore = defineStore('vn', () => {
     }
     const model = settings.value.secondApiModel?.trim() || 'gpt-3.5-turbo';
 
-    // 如果设置了预设，先加载预设
+    // 获取预设名称（猜谜和系统聊天任务不使用预设）
     const presetName = settings.value.secondApiPreset?.trim();
+
+    // 构建 ordered_prompts，不再硬编码提示词，完全依赖预设中的 EJS
+    const danmakuPayload = payload as DanmakuPayload;
+    const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] =
+      task === 'danmaku' || task === 'danmakuAndImageGen'
+        ? [{ role: 'user', content: danmakuPayload.contentText }]
+        : (payload as RiddlePayload).ordered_prompts || [];
+
+    // 猜谜和系统聊天任务不使用预设，直接用代码中构造的提示词
+    const usePreset = presetName && task !== 'riddle' && task !== 'system';
     let currentPreset: string | null = null;
-    if (presetName) {
+    if (usePreset) {
       try {
         // 保存当前预设
         currentPreset = getLoadedPresetName();
@@ -1043,9 +1076,11 @@ export const useVNStore = defineStore('vn', () => {
       } catch (e) {
         console.warn(`[SecondAPI] 加载预设失败: ${presetName}`, e);
       }
+    } else if (presetName) {
+      console.info(`[SecondAPI] 跳过预设加载（riddle/system 任务）: ${presetName}`);
     }
 
-    // 设置任务控制变量（在发送前临时修改）
+    // 设置任务控制变量（在发送前临时修改，仅预设任务需要）
     const taskControlBackup = { ...secondApiTaskControl.value };
 
     // 重置所有任务开关为 false
@@ -1053,22 +1088,19 @@ export const useVNStore = defineStore('vn', () => {
       secondApiTaskControl.value[key as keyof typeof secondApiTaskControl.value] = false;
     });
 
-    // 只开启当前任务对应的开关
+    // 只开启当前任务对应的开关（riddle 和 system 任务不使用预设，无需设置）
     if (task === 'danmaku') {
       secondApiTaskControl.value.danmaku = true;
     } else if (task === 'imageTag') {
       secondApiTaskControl.value.imageGen = true;
     } else if (task === 'shop') {
       secondApiTaskControl.value.shop = true;
-    } else if (task === 'riddle') {
-      secondApiTaskControl.value.riddle = true;
-    } else if (task === 'system') {
-      secondApiTaskControl.value.system = true;
     } else if (task === 'danmakuAndImageGen') {
       // 弹幕和生图合并调用，同时开启两个开关
       secondApiTaskControl.value.danmaku = true;
       secondApiTaskControl.value.imageGen = true;
     }
+    // riddle 和 system 任务不使用预设，跳过任务控制变量设置
 
     // 等待变量同步（watchEffect 是异步的，需要等待下一个 tick）
     await nextTick();
@@ -1085,26 +1117,9 @@ export const useVNStore = defineStore('vn', () => {
       top_k: settings.value.secondApiTopK === 'unset' ? undefined : settings.value.secondApiTopK,
     };
 
-    // 构建 ordered_prompts，不再硬编码提示词，完全依赖预设中的 EJS
-    const danmakuPayload = payload as DanmakuPayload;
-    const systemPayload = payload as SystemPayload;
-    const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] =
-      task === 'danmaku' || task === 'danmakuAndImageGen'
-        ? [{ role: 'user', content: danmakuPayload.contentText }]
-        : (payload as SystemPayload | RiddlePayload).ordered_prompts || [];
-
-    // 提取 injects（仅 system 任务支持）
-    const injects =
-      task === 'system'
-        ? systemPayload.injects?.map(inject => ({
-            ...inject,
-            position: 'absolute' as const,
-          }))
-        : undefined;
-
     const doRequest = (): Promise<string> =>
       Promise.race([
-        generateRaw({ custom_api, should_stream: false, should_silence: true, ordered_prompts, injects }),
+        generateRaw({ custom_api, should_stream: false, should_silence: true, ordered_prompts }),
         new Promise<never>((_, reject) =>
           setTimeout(() => {
             secondApiLastErrorType.value = 'timeout';
@@ -1112,6 +1127,20 @@ export const useVNStore = defineStore('vn', () => {
           }, SECOND_API_TIMEOUT_MS),
         ),
       ]);
+
+    // 调试日志：输出完整提示词
+    console.info(`[SecondAPI] === 任务: ${task} ===`);
+    ordered_prompts.forEach((p, i) => {
+      console.info(`[SecondAPI] [${i}] ${p.role.toUpperCase()}: ${p.content.slice(0, 200)}${p.content.length > 200 ? '...' : ''}`);
+    });
+
+    // 过滤世界书条目，仅保留 targetApi 为 'second' 或 'both' 的条目
+    let worldbookStates: WorldbookEntryState[] = [];
+    try {
+      worldbookStates = await filterAndApplyWorldbookForSecondApi();
+    } catch (e) {
+      console.warn('[SecondAPI] 世界书过滤失败，继续请求:', e);
+    }
 
     try {
       for (let attempt = 0; attempt <= SECOND_API_RETRY_COUNT; attempt++) {
@@ -1187,6 +1216,15 @@ export const useVNStore = defineStore('vn', () => {
           console.warn(`[SecondAPI] 恢复预设失败: ${currentPreset}`, e);
         }
       }
+
+      // 恢复世界书条目的原始状态
+      if (worldbookStates.length > 0) {
+        try {
+          await restoreWorldbookStates(worldbookStates);
+        } catch (e) {
+          console.warn('[SecondAPI] 恢复世界书状态失败:', e);
+        }
+      }
     }
   }
 
@@ -1203,8 +1241,7 @@ export const useVNStore = defineStore('vn', () => {
     if (!settings.value.danmakuEnabled) return;
     const messages = getChatMessages(message_id);
     const raw = messages[0]?.message ?? '';
-    const contentMatch = raw.match(/<content>([\s\S]*?)<\/content>/);
-    const contentText = contentMatch ? contentMatch[1].trim() : raw.trim();
+    const contentText = extractContentTag(raw);
     if (!contentText) return;
     try {
       const lines = (await callSecondApi('danmaku', { contentText })) as string[];
@@ -1220,75 +1257,6 @@ export const useVNStore = defineStore('vn', () => {
     }
   }
 
-  /** Unified API task executor - routes to main or second API based on config */
-  async function callApiForTask(task: 'danmaku' | 'imageTag', prompt: string): Promise<string> {
-    let apiType: 'main' | 'second' | 'disabled' = 'disabled';
-
-    if (task === 'danmaku') apiType = settings.value.apiTaskDanmaku;
-    else if (task === 'imageTag') apiType = settings.value.apiTaskImageTag;
-
-    if (apiType === 'disabled') return '';
-
-    if (apiType === 'second') {
-      return await callSecondApiWithTracking(task, { systemPrompt: prompt });
-    } else {
-      // Use main API - note: generate() is not available in store context
-      // For now, we'll just use second API or return empty
-      console.warn('[API] Main API not implemented for task:', task);
-      return '';
-    }
-  }
-
-  /** Wrapper for callSecondApi that tracks generations and inserts to message */
-  async function callSecondApiWithTracking(
-    task: 'danmaku' | 'imageTag',
-    payload: { systemPrompt: string },
-  ): Promise<string> {
-    const result = await callSecondApi(task, payload);
-    const content = typeof result === 'string' ? result : JSON.stringify(result);
-
-    // Record generation
-    const generation: SecondApiGeneration = {
-      id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      type: task,
-      content,
-      timestamp: Date.now(),
-      messageId: -1,
-      inserted: false,
-    };
-
-    secondApiGenerations.value.push(generation);
-
-    // Keep only last 50 generations
-    if (secondApiGenerations.value.length > 50) {
-      secondApiGenerations.value = secondApiGenerations.value.slice(-50);
-    }
-
-    // Insert to latest message
-    await insertGenerationToMessage(generation);
-
-    // Toast notification
-    showToast(`第二API已生成${task}内容`);
-
-    return content;
-  }
-
-  /** Insert second API generation to message end as HTML comment */
-  async function insertGenerationToMessage(gen: SecondApiGeneration) {
-    const messages = getChatMessages('latest');
-    const lastMessage = messages[messages.length - 1];
-
-    if (!lastMessage) return;
-
-    const marker = `\n<!-- 第二API生成(${gen.type}): ${gen.content} -->`;
-    const updatedMessage = lastMessage.message + marker;
-
-    await setChatMessages([{ message_id: lastMessage.message_id, message: updatedMessage }]);
-
-    gen.messageId = lastMessage.message_id;
-    gen.inserted = true;
-  }
-
   // ====== Worldbook Management ======
 
   /** Get all worldbook names associated with current character and chat */
@@ -1298,16 +1266,22 @@ export const useVNStore = defineStore('vn', () => {
       const charWbs = getCharWorldbookNames('current');
       if (charWbs.primary) names.push(charWbs.primary);
       names.push(...charWbs.additional);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     try {
       const chatWbName = getChatWorldbookName('current');
       if (chatWbName && !names.includes(chatWbName)) names.push(chatWbName);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     try {
       for (const n of getGlobalWorldbookNames()) {
         if (!names.includes(n)) names.push(n);
       }
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     return names;
   }
 
@@ -1401,9 +1375,106 @@ export const useVNStore = defineStore('vn', () => {
     }
   }
 
-  /** @deprecated No-op: worldbook API filtering is now handled per-entry in the worldbook manager */
+  /** @deprecated Use filterAndApplyWorldbookForSecondApi instead */
   function filterWorldbookForApi(_apiType: 'main' | 'second') {
     return null;
+  }
+
+  // ====== Worldbook API Filtering for Second API ======
+
+  type WorldbookEntryState = {
+    worldbookName: string;
+    uid: number;
+    originalEnabled: boolean;
+  };
+
+  /**
+   * 过滤世界书条目，仅保留 targetApi 为 'second' 或 'both' 的条目
+   * 用于在调用第二 API 前临时调整世界书
+   *
+   * @returns 记录所有被修改的条目状态，用于调用后恢复
+   */
+  async function filterAndApplyWorldbookForSecondApi(): Promise<WorldbookEntryState[]> {
+    const names = getAllCurrentWorldbookNames();
+    const modifiedStates: WorldbookEntryState[] = [];
+
+    for (const name of names) {
+      try {
+        const entries = await getWorldbook(name);
+        const needsUpdate = entries.filter(e => {
+          const targetApi = (e.extra?.targetApi as 'main' | 'second' | 'both') ?? 'main';
+          // 如果条目应该只发送给主 API，则临时禁用它
+          if (targetApi === 'main' && e.enabled) {
+            return true;
+          }
+          return false;
+        });
+
+        if (needsUpdate.length > 0) {
+          // 记录原始状态
+          for (const entry of needsUpdate) {
+            modifiedStates.push({
+              worldbookName: name,
+              uid: entry.uid,
+              originalEnabled: entry.enabled,
+            });
+          }
+
+          // 临时禁用这些条目
+          await updateWorldbookWith(
+            name,
+            wb =>
+              wb.map(e => {
+                const targetApi = (e.extra?.targetApi as 'main' | 'second' | 'both') ?? 'main';
+                if (targetApi === 'main' && e.enabled) {
+                  return { ...e, enabled: false };
+                }
+                return e;
+              }),
+            { render: 'immediate' },
+          );
+          console.info(`[Worldbook] 已临时禁用 ${needsUpdate.length} 个主 API 专用条目（世界书: ${name}）`);
+        }
+      } catch (e) {
+        console.warn(`[Worldbook] 过滤世界书 "${name}" 失败:`, e);
+      }
+    }
+
+    return modifiedStates;
+  }
+
+  /**
+   * 恢复世界书条目的原始状态
+   */
+  async function restoreWorldbookStates(states: WorldbookEntryState[]): Promise<void> {
+    // 按世界书分组
+    const grouped = new Map<string, WorldbookEntryState[]>();
+    for (const state of states) {
+      const list = grouped.get(state.worldbookName) ?? [];
+      list.push(state);
+      grouped.set(state.worldbookName, list);
+    }
+
+    // 逐个世界书恢复
+    for (const [worldbookName, stateList] of grouped) {
+      try {
+        await updateWorldbookWith(
+          worldbookName,
+          wb =>
+            wb.map(e => {
+              const state = stateList.find(s => s.uid === e.uid);
+              if (state) {
+                return { ...e, enabled: state.originalEnabled };
+              }
+              return e;
+            }),
+          { render: 'immediate' },
+        );
+        console.info(`[Worldbook] 已恢复 ${stateList.length} 个条目状态（世界书: ${worldbookName}）`);
+      } catch (e) {
+        console.warn(`[Worldbook] 恢复世界书 "${worldbookName}" 状态失败:`, e);
+      }
+    }
   }
 
   // Watch feature toggles and update worldbook auto-control
@@ -1455,6 +1526,7 @@ export const useVNStore = defineStore('vn', () => {
   const riddleAnswer = ref('');
   const riddleChatHistory = ref<{ role: 'user' | 'ai'; text: string }[]>([]);
   const riddleRounds = ref(0);
+  const riddlePersonalityId = ref<string | null>(null);
 
   // --- Danmaku runtime ---
   const danmakuItems = ref<DanmakuItem[]>([]);
@@ -1714,12 +1786,29 @@ export const useVNStore = defineStore('vn', () => {
 
   const riddleStartTime = ref<number | null>(null);
 
-  function startRiddle(answer: string, firstHint: string) {
+  function startRiddle(personalityId: string, answer: string, firstHint: string) {
+    riddlePersonalityId.value = personalityId;
     riddleAnswer.value = normalizeForAnswer(answer);
     riddleChatHistory.value = [{ role: 'user', text: firstHint }];
     riddleRounds.value = 1;
     riddleStartTime.value = Date.now();
     riddleActive.value = true;
+
+    const hist = systemChatHistories.value[personalityId] ?? [];
+    if (!systemChatHistories.value[personalityId]) systemChatHistories.value[personalityId] = hist;
+
+    // 如果该联系人已有猜谜记录，在最末尾加一条分割线隔开
+    const lastRiddleIdx = hist.findLastIndex(
+      m => m.role === 'riddle_start' || m.role === 'riddle_end_pending' || m.role === 'riddle_end',
+    );
+    if (lastRiddleIdx >= 0) {
+      hist.splice(lastRiddleIdx + 1, 0, { role: 'riddle_divider', text: '' });
+    }
+
+    hist.push({ role: 'riddle_divider', text: '' });
+    hist.push({ role: 'riddle_start', text: '' });
+    hist.push({ role: 'user', text: firstHint });
+    hist.push({ role: 'riddle_end_pending', text: '' });
   }
 
   function riddleAnswerContains(userInput: string): boolean {
@@ -1746,6 +1835,7 @@ export const useVNStore = defineStore('vn', () => {
     riddleActive.value = false;
     riddleChatHistory.value = [];
     riddleStartTime.value = null;
+    riddlePersonalityId.value = null;
     const personality = SYSTEM_PERSONALITIES.find(p => p.id === (lastActiveUnlockedPersonalityId.value ?? ''));
     const lines = personality?.proactiveLines?.riddle_solved;
     if (lines?.length) addProactiveToSystemChat(lines[Math.floor(Math.random() * lines.length)]!);
@@ -1762,20 +1852,104 @@ export const useVNStore = defineStore('vn', () => {
     return { won: false, reward: 0 };
   }
 
-  function endRiddle() {
+  function abortRiddleByUser(personalityId: string) {
+    const hist = systemChatHistories.value[personalityId] ?? [];
+    if (!systemChatHistories.value[personalityId]) systemChatHistories.value[personalityId] = hist;
+    const idx = hist.findLastIndex(m => m.role === 'riddle_end_pending');
+    if (idx >= 0) {
+      hist[idx] = { role: 'riddle_end', text: '' };
+      hist.splice(idx + 1, 0, { role: 'riddle_divider', text: '' });
+    }
+
+    // 放弃不结算金币，仅记录上次战绩为 0 奖励
+    gameData.value.riddleLastRecord = {
+      answer: riddleAnswer.value,
+      rounds: riddleRounds.value,
+      reward: 0,
+      timestamp: Date.now(),
+    };
+
     riddleActive.value = false;
     riddleChatHistory.value = [];
     riddleStartTime.value = null;
+    riddlePersonalityId.value = null;
   }
 
-  async function requestRiddleAiReply(): Promise<{ won: boolean; reward: number }> {
+  function endRiddle() {
+    if (riddlePersonalityId.value) {
+      abortRiddleByUser(riddlePersonalityId.value);
+    } else {
+      riddleActive.value = false;
+      riddleChatHistory.value = [];
+      riddleStartTime.value = null;
+      riddlePersonalityId.value = null;
+    }
+  }
+
+  async function requestRiddleAiReply(): Promise<{ won: boolean; reward: number; reply: string }> {
     const hist = riddleChatHistory.value;
+    const pid = riddlePersonalityId.value;
+    const personality = SYSTEM_PERSONALITIES.find(p => p.id === pid);
+    const personalityPrompt = personality?.systemPrompt ?? '你是一个助手。';
+
+    // 构造系统提示词：包含角色设定、猜谜规则、聊天记录、最新提示
+    const chatLogText = hist
+      .map(m => m.role === 'ai' ? `对方：${m.text}` : `你：${m.text}`)
+      .join('\n');
+    const latestHint = hist.length > 0 ? hist[hist.length - 1]!.text : '';
+
+    const systemPromptContent = `${personalityPrompt}
+
+————
+你正在和用户玩猜谜游戏。
+
+规则：
+- 用户会给你提示
+- 你需要根据提示猜测一个词（谜底）
+- 你只能回复你的猜测或请求更多提示
+- 不要重复用户的提示
+- 若你猜中了谜底，在回复中自然地说出答案即可
+
+示例对话：
+用户：这是一种水果
+AI：是苹果吗？
+用户：不对，它是黄色的
+AI：是香蕉！
+
+————
+这是之前的对话记录：
+${chatLogText}
+————
+这是这次的提示
+${latestHint}
+你觉得这个可能是什么？`;
+
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
-      ...hist.map(m => ({ role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant', content: m.text })),
+      { role: 'system', content: systemPromptContent },
+      { role: 'user', content: '请回复你的猜测。' },
     ];
     const raw = (await callSecondApi('riddle', { ordered_prompts })) as string;
     const reply = raw?.trim() || '让我再想想…';
-    return addRiddleAiReply(reply);
+    const result = addRiddleAiReply(reply);
+    return { ...result, reply };
+  }
+
+  async function bootstrapRiddleFirstReply(personalityId: string): Promise<string> {
+    if (!riddleActive.value || riddlePersonalityId.value !== personalityId) return '';
+    const hist = systemChatHistories.value[personalityId] ?? [];
+    if (!systemChatHistories.value[personalityId]) systemChatHistories.value[personalityId] = hist;
+
+    const result = await requestRiddleAiReply();
+    const pendingIdx = hist.findLastIndex(m => m.role === 'riddle_end_pending');
+    if (pendingIdx >= 0) hist.splice(pendingIdx, 0, { role: 'assistant', text: result.reply });
+    else hist.push({ role: 'assistant', text: result.reply });
+
+    if (result.won) {
+      const idx = hist.findLastIndex(m => m.role === 'riddle_end_pending');
+      if (idx >= 0) hist[idx] = { role: 'riddle_end', text: '' };
+    }
+
+    return result.reply;
   }
 
   // ====== Shop ======
@@ -1871,33 +2045,79 @@ export const useVNStore = defineStore('vn', () => {
     }
     const hist = systemChatHistories.value[personalityId] ?? [];
     if (!systemChatHistories.value[personalityId]) systemChatHistories.value[personalityId] = hist;
+
+    // 情报交换进行中：使用猜谜 API 流程
+    if (riddleActive.value && riddlePersonalityId.value === personalityId) {
+      if (riddleAnswerContains(userText)) {
+        showToast('输入中包含谜底，已拦截');
+        return '';
+      }
+      const ok = addRiddleUserMessage(userText);
+      if (!ok) {
+        showToast('输入中包含谜底，已拦截');
+        return '';
+      }
+
+      // 始终插在“结束线”之前
+      const pendingIdx = hist.findLastIndex(m => m.role === 'riddle_end_pending');
+      if (pendingIdx >= 0) hist.splice(pendingIdx, 0, { role: 'user', text: userText });
+      else hist.push({ role: 'user', text: userText });
+
+      try {
+        const result = await requestRiddleAiReply();
+        const pendingIdx2 = hist.findLastIndex(m => m.role === 'riddle_end_pending');
+        if (pendingIdx2 >= 0) hist.splice(pendingIdx2, 0, { role: 'assistant', text: result.reply });
+        else hist.push({ role: 'assistant', text: result.reply });
+
+        if (result.won) {
+          // 将结束线由 pending -> end
+          const idx = hist.findLastIndex(m => m.role === 'riddle_end_pending');
+          if (idx >= 0) hist[idx] = { role: 'riddle_end', text: '' };
+          // 在猜谜结束后追加一条分割线，与下一段普通聊天分隔
+          hist.splice(idx + 1, 0, { role: 'riddle_divider', text: '' });
+          const personality = SYSTEM_PERSONALITIES.find(p => p.id === personalityId);
+          showToast(`[ ${personality?.name ?? '系统'} ] 猜谜结束，获得 ${result.reward}G`);
+        }
+
+        if (activePersonalityId.value !== personalityId) {
+          unreadPersonalityIds.value.add(personalityId);
+        }
+        return result.reply;
+      } catch {
+        return '';
+      }
+    }
+
+    // 普通末世通讯流程
     hist.push({ role: 'user', text: userText });
     const personality = SYSTEM_PERSONALITIES.find(p => p.id === personalityId);
     const systemPrompt = personality?.systemPrompt ?? '你是一个助手。';
 
-    // Build ordered_prompts: System -> History -> User Input
-    const historyPrompts = hist
-      .slice(0, -1) // exclude the user message we just pushed (will be added at end)
-      .map(m => ({ role: m.role === 'proactive' ? 'assistant' : m.role, content: m.text }));
+    const historyPrompts = hist.slice(0, -1).reduce<{ role: 'assistant' | 'user'; content: string }[]>((acc, m) => {
+      if (m.role === 'user') acc.push({ role: 'user', content: m.text });
+      else if (m.role === 'assistant' || m.role === 'proactive') acc.push({ role: 'assistant', content: m.text });
+      return acc;
+    }, []);
 
+    // 构建 ordered_prompts，如果有剧情参考则插入到用户输入之前
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] = [
       { role: 'system', content: systemPrompt },
       ...historyPrompts,
-      { role: 'user', content: userText },
     ];
 
-    // Build injects for context (剧情引用)
-    const injects: { depth: number; role: 'system' | 'assistant' | 'user'; content: string }[] | undefined =
-      options?.context
-        ? [
-            { depth: 2, role: 'user', content: `[剧情参考]\n${options.context}` },
-            { depth: 1, role: 'assistant', content: '好的，我已了解相关剧情内容。' },
-          ]
-        : undefined;
+    // 剧情参考注入：插入到用户输入之前
+    if (options?.context) {
+      ordered_prompts.push(
+        { role: 'user', content: `[剧情参考]\n${options.context}` },
+        { role: 'assistant', content: '好的，我已了解相关剧情内容。' },
+      );
+    }
+
+    ordered_prompts.push({ role: 'user', content: userText });
 
     lastSystemPrompts.value = ordered_prompts;
     try {
-      const reply = (await callSecondApi('system', { ordered_prompts, injects })) as string;
+      const reply = (await callSecondApi('system', { ordered_prompts })) as string;
       if (!reply) {
         const model = settings.value.secondApiModel?.trim();
         if (!model) {
@@ -1929,6 +2149,41 @@ export const useVNStore = defineStore('vn', () => {
     const p = SYSTEM_PERSONALITIES.find(x => x.id === id);
     const fromName = p?.name ?? '系统';
     showToast(`[ ${fromName} ] 发来消息`);
+  }
+
+  function insertChatDivider(personalityId: string) {
+    const hist = systemChatHistories.value[personalityId] ?? [];
+    if (!systemChatHistories.value[personalityId]) systemChatHistories.value[personalityId] = hist;
+    // 如果末尾已经是分割线则不重复插入
+    if (hist.length > 0 && hist[hist.length - 1].role === 'divider') return;
+    hist.push({ role: 'divider', text: '' });
+  }
+
+  function clearHistoryBeforeDivider(personalityId: string) {
+    const hist = systemChatHistories.value[personalityId];
+    if (!hist) return;
+    const dividerIdx = hist.findLastIndex(
+      m =>
+        m.role === 'divider' || m.role === 'riddle_start' || m.role === 'riddle_end_pending' || m.role === 'riddle_end',
+    );
+    if (dividerIdx === -1) {
+      systemChatHistories.value[personalityId] = [];
+      return;
+    }
+
+    // 若清理到了进行中的猜谜，强制结束并不结算
+    const remain = hist.slice(dividerIdx + 1);
+    const removingRiddle = hist
+      .slice(0, dividerIdx + 1)
+      .some(m => m.role === 'riddle_start' || m.role === 'riddle_end_pending' || m.role === 'riddle_end');
+    if (removingRiddle && riddlePersonalityId.value === personalityId) {
+      riddleActive.value = false;
+      riddleChatHistory.value = [];
+      riddleStartTime.value = null;
+      riddlePersonalityId.value = null;
+    }
+
+    systemChatHistories.value[personalityId] = remain;
   }
 
   type ProactiveEventKey = keyof NonNullable<SystemPersonality['proactiveLines']>;
@@ -2082,12 +2337,15 @@ export const useVNStore = defineStore('vn', () => {
     riddleAnswer,
     riddleChatHistory,
     riddleRounds,
+    riddlePersonalityId,
     startRiddle,
     normalizeForAnswer,
     riddleAnswerContains,
     addRiddleUserMessage,
     addRiddleAiReply,
     requestRiddleAiReply,
+    bootstrapRiddleFirstReply,
+    abortRiddleByUser,
     endRiddle,
     shopItems,
     shopRefreshing,
@@ -2108,6 +2366,8 @@ export const useVNStore = defineStore('vn', () => {
     lastSystemPrompts,
     addProactiveToSystemChat,
     triggerProactive,
+    insertChatDivider,
+    clearHistoryBeforeDivider,
     setOverlay,
     toggleLeftMenu,
     toggleRightMenu,
@@ -2125,6 +2385,7 @@ export const useVNStore = defineStore('vn', () => {
     getEnhancedWorldbook,
     updateWorldbookEntry,
     updateWorldbookAutoControl,
-    filterWorldbookForApi,
+    filterAndApplyWorldbookForSecondApi,
+    restoreWorldbookStates,
   };
 });

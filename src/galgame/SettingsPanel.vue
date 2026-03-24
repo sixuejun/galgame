@@ -30,7 +30,7 @@
       </div>
 
       <!-- Content -->
-      <div class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: 600px">
+      <div class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: min(600px, calc(100vh - 120px))">
         <!-- Volume -->
         <SectionHeader icon="fa-volume-high" title="音量设置" />
         <div class="mb-6 pl-2">
@@ -171,6 +171,11 @@
                 @change="store.updateSettings({ secondApiModel: ($event.target as HTMLSelectElement).value })"
               >
                 <option value="">选择模型</option>
+                <!-- 已保存的模型不在列表中时显示为独立选项 -->
+                <option
+                  v-if="store.settings.secondApiModel && !store.secondApiModelList.includes(store.settings.secondApiModel)"
+                  :value="store.settings.secondApiModel"
+                >{{ store.settings.secondApiModel }}</option>
                 <option v-for="m in store.secondApiModelList" :key="m" :value="m">{{ m }}</option>
               </select>
               <button
@@ -516,7 +521,7 @@ const danmakuDisplayOptions = [
 ];
 
 const panelStyle = {
-  maxHeight: '700px',
+  maxHeight: 'min(700px, calc(100vh - 40px))',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',

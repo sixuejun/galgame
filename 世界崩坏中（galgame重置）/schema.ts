@@ -9,6 +9,35 @@ const 角色Schema = z.object({
   状态: z.string().prefault('正常'),
 });
 
+// ===== 系统控制变量 Schema（仅前端使用）=====
+
+const 系统任务控制 = z.object({
+  vn_task_danmaku: z.boolean().prefault(false),
+  vn_task_imageGen: z.boolean().prefault(false),
+  vn_task_shop: z.boolean().prefault(false),
+});
+
+const 第二API生成记录 = z.object({
+  id: z.string(),
+  type: z.enum(['danmaku', 'imageTag', 'variable', 'boardGameEvent']),
+  content: z.string(),
+  timestamp: z.number(),
+  messageId: z.number(),
+  inserted: z.boolean(),
+});
+
+const 系统人格消息 = z.object({
+  role: z.enum(['user', 'assistant', 'proactive', 'divider', 'riddle_divider', 'riddle_start', 'riddle_end_pending', 'riddle_end']),
+  text: z.string(),
+});
+
+const 图片卡牌 = z.object({
+  id: z.string(),
+  imageData: z.string(),
+  type: z.enum(['background', 'cg']),
+  timestamp: z.number(),
+});
+
 export const Schema = z.object({
   日期: z.string().prefault('2月11日'),
   时间: z.string().prefault('09:00'),
@@ -74,4 +103,14 @@ export const Schema = z.object({
     当前事件: z.array(z.string()).prefault(['无']),
     事件大纲: z.array(z.string()).prefault(['无']),
   }).prefault({}),
+
+  // ===== 系统控制变量（仅前端使用）=====
+  ...系统任务控制.shape,
+  vn_second_api_generations: z.array(第二API生成记录).prefault([]),
+  vn_system_chats: z.record(z.string(), z.array(系统人格消息)).prefault({}),
+  vn_unlocked_personality_ids: z.array(z.string()).prefault(['sys_calm']),
+  vn_last_active_unlocked_personality_id: z.string().prefault('sys_calm'),
+  vn_bg_gen_enabled: z.boolean().prefault(false),
+  vn_cg_gen_enabled: z.boolean().prefault(false),
+  vn_image_cards: z.array(图片卡牌).prefault([]),
 });

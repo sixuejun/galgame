@@ -8,20 +8,27 @@
 
     <!-- Special: board game needs a wide panel -->
     <template v-if="moduleId === 'board_game'">
-      <div
-        class="relative mx-4 border overflow-hidden animate-fade-in-up"
-        :style="boardGamePanel"
-      >
+      <div class="relative mx-4 border overflow-hidden animate-fade-in-up" :style="boardGamePanel">
         <div
-          :style="{ height: '3px', background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)' }"
+          :style="{
+            height: '3px',
+            background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)',
+          }"
         />
-        <div class="flex items-center justify-between px-5 py-2.5" :style="{ borderBottom: '1px solid rgba(90,79,64,0.3)' }">
+        <div
+          class="flex items-center justify-between px-5 py-2.5"
+          :style="{ borderBottom: '1px solid rgba(90,79,64,0.3)' }"
+        >
           <div class="flex items-center gap-3">
-            <span style="color:var(--rust)"><i class="fa-solid fa-dice-d6" style="font-size:0.9rem" /></span>
-            <h2 class="text-sm font-bold tracking-widest" style="color:rgba(212,197,160,0.9)">废土行路</h2>
+            <span style="color: var(--rust)"><i class="fa-solid fa-dice-d6" style="font-size: 0.9rem" /></span>
+            <h2 class="text-sm font-bold tracking-widest" style="color: rgba(212, 197, 160, 0.9)">废土行路</h2>
           </div>
-          <button class="flex items-center gap-1 text-xs cursor-pointer" style="color:var(--vn-muted)" @click="$emit('close')">
-            <i class="fa-solid fa-arrow-left" style="font-size:0.75rem" />
+          <button
+            class="flex items-center gap-1 text-xs cursor-pointer"
+            style="color: var(--vn-muted)"
+            @click="$emit('close')"
+          >
+            <i class="fa-solid fa-arrow-left" style="font-size: 0.75rem" />
             <span>返回</span>
           </button>
         </div>
@@ -31,25 +38,18 @@
 
     <!-- Special: 2048 fills the window with its own header -->
     <template v-else-if="moduleId === 'puzzle_2048'">
-      <div
-        class="relative mx-4 border overflow-hidden animate-fade-in-up"
-        :style="puzzle2048Panel"
-      >
+      <div class="relative mx-4 border overflow-hidden animate-fade-in-up" :style="puzzle2048Panel">
         <Puzzle2048Module @close="$emit('close')" />
       </div>
     </template>
 
     <!-- Standard module layout -->
     <template v-else-if="resolvedMod">
-      <div
-        class="relative w-full max-w-xl mx-4 border overflow-hidden animate-fade-in-up"
-        :style="panelStyle"
-      >
+      <div class="relative w-full max-w-xl mx-4 border overflow-hidden animate-fade-in-up" :style="panelStyle">
         <div
           :style="{
             height: '3px',
-            background:
-              'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)',
+            background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.6), transparent)',
           }"
         />
 
@@ -60,14 +60,9 @@
         >
           <div class="flex items-center gap-3">
             <span style="color: var(--rust)"
-              ><i
-                :class="'fa-solid ' + resolvedMod.icon"
-                style="font-size: 1rem"
+              ><i :class="'fa-solid ' + resolvedMod.icon" style="font-size: 1rem"
             /></span>
-            <h2
-              class="text-sm font-bold tracking-widest"
-              style="color: rgba(212, 197, 160, 0.9)"
-            >
+            <h2 class="text-sm font-bold tracking-widest" style="color: rgba(212, 197, 160, 0.9)">
               {{ resolvedMod.displayName }}
             </h2>
           </div>
@@ -82,10 +77,7 @@
         </div>
 
         <!-- Module content -->
-        <div
-          class="overflow-y-auto no-scrollbar"
-          style="max-height: 600px"
-        >
+        <div class="overflow-y-auto no-scrollbar" style="max-height: 600px">
           <ShopModule v-if="moduleId === 'shop'" />
           <WorkshopModule v-else-if="moduleId === 'idle_workshop'" />
           <RiddleModule v-else-if="moduleId === 'ai_riddle'" />
@@ -93,10 +85,7 @@
           <GoldLogModule v-else-if="moduleId === 'gold_log'" />
 
           <!-- Fallback -->
-          <div
-            v-else
-            class="px-6 py-12 flex flex-col items-center justify-center text-center"
-          >
+          <div v-else class="px-6 py-12 flex flex-col items-center justify-center text-center">
             <div
               class="w-16 h-16 border flex items-center justify-center mb-4"
               :style="{
@@ -104,10 +93,7 @@
                 background: 'rgba(74,64,53,0.1)',
               }"
             >
-              <i
-                :class="'fa-solid ' + resolvedMod.icon"
-                style="color: rgba(139, 69, 19, 0.4); font-size: 1.5rem"
-              />
+              <i :class="'fa-solid ' + resolvedMod.icon" style="color: rgba(139, 69, 19, 0.4); font-size: 1.5rem" />
             </div>
             <p class="text-sm" style="color: var(--vn-muted)">
               {{ resolvedMod.description }}
@@ -118,8 +104,7 @@
         <div
           :style="{
             height: '2px',
-            background:
-              'linear-gradient(to right, transparent, rgba(139,69,19,0.5), transparent)',
+            background: 'linear-gradient(to right, transparent, rgba(139,69,19,0.5), transparent)',
           }"
         />
       </div>
@@ -128,13 +113,13 @@
 </template>
 
 <script setup lang="ts">
-import type { GameModule } from './store';
 import BoardGameModule from './BoardGameModule.vue';
 import GoldLogModule from './GoldLogModule.vue';
 import InventoryModule from './InventoryModule.vue';
 import Puzzle2048Module from './Puzzle2048Module.vue';
 import RiddleModule from './RiddleModule.vue';
 import ShopModule from './ShopModule.vue';
+import type { GameModule } from './store';
 import { useVNStore } from './store';
 import WorkshopModule from './WorkshopModule.vue';
 

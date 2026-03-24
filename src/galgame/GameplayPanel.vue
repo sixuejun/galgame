@@ -196,20 +196,55 @@
           <div ref="chatAreaRef" class="sys-chat-main">
             <div ref="chatMessagesRef" class="sys-chat-messages">
               <template v-if="store.activePersonalityId">
-                <div
-                  v-for="(msg, i) in currentChatHistory"
-                  :key="i"
-                  class="sys-msg"
-                  :class="msg.role === 'user' ? 'sys-msg-right' : 'sys-msg-left'"
-                >
-                  <div v-if="msg.role === 'proactive'" class="sys-proactive-tag">
-                    <i class="fa-solid fa-bolt" style="font-size: 7px" />
-                    吐槽
+                <template v-for="(msg, i) in currentChatHistory" :key="i">
+                  <!-- 普通清理分割线 -->
+                  <div
+                    v-if="msg.role === 'divider'"
+                    class="sys-chat-divider"
+                    @click="store.clearHistoryBeforeDivider(store.activePersonalityId!)"
+                  >
+                    <span class="sys-chat-divider-text">—— ✦ 清除以上历史记录 ✦ ——</span>
                   </div>
-                  <div class="sys-msg-bubble" :class="msg.role === 'user' ? 'sys-bubble-user' : 'sys-bubble-system'">
-                    {{ msg.text }}
+
+                  <!-- 情报交换专用分割线（双线装饰，无文字无交互） -->
+                  <div v-else-if="msg.role === 'riddle_divider'" class="sys-chat-riddle-divider">
+                    <div class="sys-chat-riddle-divider-line" />
                   </div>
-                </div>
+
+                  <!-- 情报交换开始分割线 -->
+                  <div v-else-if="msg.role === 'riddle_start'" class="sys-chat-divider sys-chat-divider-riddle-start">
+                    <span class="sys-chat-divider-text">—— ✧ 情报交换模块 ✧ ——</span>
+                  </div>
+
+                  <!-- 情报交换进行中结束线（可放弃） -->
+                  <div
+                    v-else-if="msg.role === 'riddle_end_pending'"
+                    class="sys-chat-divider sys-chat-divider-riddle-end"
+                    @click="openRiddleAbortConfirm()"
+                  >
+                    <div class="sys-riddle-settle">当前结算金额：{{ 50 + store.riddleRounds * 20 }}G</div>
+                    <span class="sys-chat-divider-text">—— ✧ 放弃猜谜 ✧ ——</span>
+                  </div>
+
+                  <!-- 情报交换已结束 -->
+                  <div
+                    v-else-if="msg.role === 'riddle_end'"
+                    class="sys-chat-divider sys-chat-divider-riddle-end-finished"
+                  >
+                    <span class="sys-chat-divider-text">—— ✧ 模块结束 ✧ ——</span>
+                  </div>
+
+                  <!-- 普通消息 -->
+                  <div v-else class="sys-msg" :class="msg.role === 'user' ? 'sys-msg-right' : 'sys-msg-left'">
+                    <div v-if="msg.role === 'proactive'" class="sys-proactive-tag">
+                      <i class="fa-solid fa-bolt" style="font-size: 7px" />
+                      吐槽
+                    </div>
+                    <div class="sys-msg-bubble" :class="msg.role === 'user' ? 'sys-bubble-user' : 'sys-bubble-system'">
+                      {{ msg.text }}
+                    </div>
+                  </div>
+                </template>
                 <div v-if="currentChatHistory.length === 0" class="sys-empty-chat">
                   <i class="fa-solid fa-satellite-dish" style="font-size: 1.2rem; opacity: 0.3" />
                   <span>频道已接通，发送消息开始对话</span>
@@ -272,15 +307,6 @@
                   :disabled="!store.activePersonalityId || systemChatSending"
                   @keydown.enter="sendSystemMessage"
                 />
-                <!-- Debug: view prompts -->
-                <button
-                  v-if="store.lastSystemPrompts.length > 0"
-                  class="sys-debug-btn"
-                  title="查看上次发送的提示词"
-                  @click="showPromptDebug = true"
-                >
-                  <i class="fa-solid fa-eye" style="font-size: 0.75rem" />
-                </button>
                 <button
                   class="sys-send-btn"
                   :disabled="!systemChatInput.trim() || !store.activePersonalityId || systemChatSending"
@@ -295,35 +321,18 @@
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <!-- Prompt Debug Overlay -->
-            <div v-if="showPromptDebug" class="sys-prompt-debug-overlay" @click.self="showPromptDebug = false">
-              <div class="sys-prompt-debug-panel">
-                <div class="sys-prompt-debug-header">
-                  <span
-                    ><i
-                      class="fa-solid fa-terminal"
-                      style="margin-right: 6px; color: var(--rust)"
-                    />上次发送给第二API的提示词</span
-                  >
-                  <button class="sys-prompt-debug-close" @click="showPromptDebug = false">
-                    <i class="fa-solid fa-xmark" />
-                  </button>
-                </div>
-                <div class="sys-prompt-debug-body">
-                  <div
-                    v-for="(p, i) in store.lastSystemPrompts"
-                    :key="i"
-                    class="sys-prompt-block"
-                    :class="'sys-prompt-' + p.role"
-                  >
-                    <div class="sys-prompt-role-label">{{ p.role.toUpperCase() }}</div>
-                    <pre class="sys-prompt-content">{{ p.content }}</pre>
-                  </div>
-                </div>
-                <div class="sys-prompt-debug-footer">提示词结构：System → History → Context（@引用）→ User Input</div>
-              </div>
-            </div>
+      <!-- 放弃猜谜二次确认 -->
+      <div v-if="showRiddleAbortConfirm" class="sys-riddle-confirm-mask" @click.self="showRiddleAbortConfirm = false">
+        <div class="sys-riddle-confirm-panel">
+          <div class="sys-riddle-confirm-title">确认放弃当前猜谜？</div>
+          <div class="sys-riddle-confirm-sub">将结束本次情报交换并记录当前进度</div>
+          <div class="sys-riddle-confirm-actions">
+            <button class="sys-riddle-confirm-cancel" @click="showRiddleAbortConfirm = false">取消</button>
+            <button class="sys-riddle-confirm-ok" @click="confirmAbortRiddle">确认放弃</button>
           </div>
         </div>
       </div>
@@ -441,7 +450,21 @@ function clearAtContext() {
 }
 
 // --- Prompt debug viewer ---
-const showPromptDebug = ref(false);
+const showRiddleAbortConfirm = ref(false);
+
+function openRiddleAbortConfirm() {
+  if (!store.riddleActive || !store.activePersonalityId) return;
+  if (store.riddlePersonalityId !== store.activePersonalityId) return;
+  showRiddleAbortConfirm.value = true;
+}
+
+function confirmAbortRiddle() {
+  const pid = store.activePersonalityId;
+  if (!pid) return;
+  store.abortRiddleByUser(pid);
+  showRiddleAbortConfirm.value = false;
+  scrollChatToBottom();
+}
 
 const moduleGridRef = ref<HTMLElement>();
 const systemChatRef = ref<HTMLElement>();
@@ -481,6 +504,11 @@ async function openSystemChat() {
   store.systemChatOpen = true;
   if (!store.activePersonalityId && store.SYSTEM_PERSONALITIES.length > 0) {
     store.selectSystemPersonality(store.SYSTEM_PERSONALITIES[0].id);
+  }
+
+  // 每次打开时为当前联系人插入分割线（情报交换进行中时不插入普通分割线）
+  if (store.activePersonalityId && !(store.riddleActive && store.riddlePersonalityId === store.activePersonalityId)) {
+    store.insertChatDivider(store.activePersonalityId);
   }
 
   const grid = moduleGridRef.value;
@@ -683,6 +711,16 @@ function handleBackdropClick() {
 watch(
   () => store.activePersonalityId && currentChatHistory.value.length,
   () => scrollChatToBottom(),
+);
+
+// 允许其他模块（情报交换）直接请求打开末世通讯
+watch(
+  () => store.systemChatOpen,
+  async open => {
+    if (open && !chatMode.value && !transitioning.value) {
+      await openSystemChat();
+    }
+  },
 );
 </script>
 
@@ -950,6 +988,112 @@ watch(
   align-items: flex-end;
 }
 
+.sys-chat-divider {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 6px 0;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+.sys-chat-divider:hover {
+  opacity: 0.85;
+}
+.sys-chat-divider-text {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--vn-muted);
+  font-family: monospace;
+  user-select: none;
+}
+
+.sys-chat-divider-riddle-start,
+.sys-chat-divider-riddle-end,
+.sys-chat-divider-riddle-end-finished {
+  opacity: 0.8;
+}
+
+.sys-chat-divider-riddle-end {
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 情报交换专用的纯装饰性双线分割 */
+.sys-chat-riddle-divider {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 0;
+  flex-shrink: 0;
+  gap: 3px;
+}
+.sys-chat-riddle-divider-line {
+  height: 1px;
+  background: rgba(212, 197, 160, 0.4);
+}
+
+.sys-riddle-settle {
+  font-size: 9px;
+  color: var(--vn-muted);
+  font-family: monospace;
+  margin-bottom: 1px;
+  text-align: center;
+  align-self: center;
+}
+
+.sys-riddle-confirm-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sys-riddle-confirm-panel {
+  width: min(320px, calc(100% - 32px));
+  border: 1px solid rgba(90, 79, 64, 0.45);
+  background: rgba(42, 36, 32, 0.95);
+  border-radius: 2px;
+  padding: 14px;
+}
+
+.sys-riddle-confirm-title {
+  font-size: 12px;
+  color: var(--vn-fg);
+  margin-bottom: 6px;
+}
+
+.sys-riddle-confirm-sub {
+  font-size: 10px;
+  color: var(--vn-muted);
+  margin-bottom: 12px;
+}
+
+.sys-riddle-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sys-riddle-confirm-cancel,
+.sys-riddle-confirm-ok {
+  border: 1px solid rgba(90, 79, 64, 0.45);
+  border-radius: 2px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--vn-muted);
+}
+
+.sys-riddle-confirm-ok {
+  color: var(--vn-fg);
+  border-color: rgba(139, 69, 19, 0.45);
+}
+
 .sys-proactive-tag {
   display: inline-flex;
   align-items: center;
@@ -1126,135 +1270,6 @@ watch(
 .sys-at-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-}
-
-/* debug eye button */
-.sys-debug-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 34px;
-  border: 1px solid rgba(90, 79, 64, 0.35);
-  background: transparent;
-  color: rgba(139, 125, 107, 0.6);
-  border-radius: 17px;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-.sys-debug-btn:hover {
-  color: var(--stain);
-  border-color: rgba(196, 162, 101, 0.4);
-}
-
-/* Prompt debug overlay */
-.sys-prompt-debug-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(20, 16, 12, 0.8);
-  z-index: 100;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 12px;
-  overflow-y: auto;
-}
-.sys-prompt-debug-panel {
-  width: 100%;
-  max-height: calc(100% - 24px);
-  display: flex;
-  flex-direction: column;
-  background: rgba(35, 30, 26, 0.98);
-  border: 1px solid rgba(139, 69, 19, 0.4);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.sys-prompt-debug-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid rgba(90, 79, 64, 0.3);
-  font-size: 10px;
-  font-family: monospace;
-  color: rgba(212, 197, 160, 0.8);
-  letter-spacing: 0.05em;
-}
-.sys-prompt-debug-close {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--vn-muted);
-  background: none;
-  border: none;
-  font-size: 0.8rem;
-}
-.sys-prompt-debug-close:hover {
-  color: var(--rust);
-}
-.sys-prompt-debug-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.sys-prompt-block {
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid transparent;
-}
-.sys-prompt-system {
-  border-color: rgba(139, 69, 19, 0.35);
-  background: rgba(139, 69, 19, 0.07);
-}
-.sys-prompt-user {
-  border-color: rgba(90, 79, 64, 0.3);
-  background: rgba(74, 64, 53, 0.15);
-}
-.sys-prompt-assistant {
-  border-color: rgba(90, 122, 74, 0.25);
-  background: rgba(90, 122, 74, 0.06);
-}
-.sys-prompt-role-label {
-  font-size: 8px;
-  font-family: monospace;
-  font-weight: bold;
-  letter-spacing: 0.15em;
-  padding: 3px 8px;
-  border-bottom: 1px solid rgba(90, 79, 64, 0.2);
-}
-.sys-prompt-system .sys-prompt-role-label {
-  color: var(--rust);
-}
-.sys-prompt-user .sys-prompt-role-label {
-  color: var(--stain);
-}
-.sys-prompt-assistant .sys-prompt-role-label {
-  color: var(--vn-success);
-}
-.sys-prompt-content {
-  font-size: 10px;
-  font-family: 'Noto Serif SC', monospace;
-  color: rgba(212, 197, 160, 0.8);
-  white-space: pre-wrap;
-  word-break: break-all;
-  padding: 6px 8px;
-  margin: 0;
-  line-height: 1.6;
-}
-.sys-prompt-debug-footer {
-  padding: 6px 12px;
-  border-top: 1px solid rgba(90, 79, 64, 0.2);
-  font-size: 9px;
-  font-family: monospace;
-  color: rgba(139, 125, 107, 0.5);
-  letter-spacing: 0.03em;
 }
 
 .sys-chat-input {

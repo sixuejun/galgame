@@ -13,8 +13,8 @@
       <div class="pointer-events-auto flex-shrink-0">
         <QuickAccessMenu :is-fullscreen="isFullscreen" @toggle-fullscreen="toggleFullscreen" />
       </div>
-      <div class="flex-1 min-h-0" />
-      <div class="pointer-events-auto pb-6 md:pb-8 flex-shrink-0">
+      <div class="min-h-0 flex-1" />
+      <div class="pointer-events-auto flex-shrink-0 pb-6 md:pb-8">
         <DialogueBox :choices="choices" :during-streaming="context.during_streaming" />
       </div>
     </div>
@@ -22,10 +22,7 @@
     <ChoicePanel :choices="choices" :message-id="context.message_id" @choice-submitted="handleChoiceSubmitted" />
 
     <SettingsPanel v-if="store.activeOverlay === 'settings'" />
-    <HistoryPanel
-      v-if="store.activeOverlay === 'history'"
-      @go-to-line="handleGoToLine"
-    />
+    <HistoryPanel v-if="store.activeOverlay === 'history'" @go-to-line="handleGoToLine" />
     <CharacterPanel v-if="store.activeOverlay === 'character'" />
     <GameplayPanel v-if="store.activeOverlay === 'gameplay'" />
 
@@ -96,7 +93,7 @@ const toastAnim = ref<'in' | 'out' | 'hidden'>('hidden');
 // 监听消息变化，自动解析
 watch(
   () => context.message,
-  async (newMessage) => {
+  async newMessage => {
     if (newMessage) {
       await store.parseCurrentMessage(newMessage);
     }

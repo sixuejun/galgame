@@ -1,4 +1,5 @@
 import { mountStreamingMessages } from '@util/streaming';
+import { extractContentTag, extractPlainTextFromContent } from './utils/messageParser';
 import App from './App.vue';
 import './theme.css';
 
@@ -86,9 +87,15 @@ $(() => {
 
     const messages = getChatMessages(message_id);
     const raw = messages[0]?.message ?? '';
-    const contentMatch = raw.match(/<content>([\s\S]*?)<\/content>/);
-    const contentText = contentMatch ? contentMatch[1].trim() : raw.trim();
+    const contentText = extractContentTag(raw);
     if (!contentText) return;
+
+    // 同步剧情文本到酒馆变量，供 {{getvar::剧情文本}} 使用
+    const plainText = extractPlainTextFromContent(raw);
+    if (plainText) {
+      insertOrAssignVariables({ '剧情文本': plainText }, { type: 'chat' });
+      console.info('[剧情文本] 已更新剧情文本变量');
+    }
 
     // 检查是否需要弹幕
     const needDanmaku = mainStore.settings.danmakuEnabled && mainStore.settings.apiTaskDanmaku === 'second';

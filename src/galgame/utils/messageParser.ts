@@ -171,25 +171,99 @@ function parseBlock(blockText: string, resources: WorldbookResources): MessageBl
 }
 
 /**
+ * 从消息中提取 <content>...</content> 标签内的内容
+ * 若消息中没有 <content> 标签，返回空字符串（VN 主舞台不显示任何内容）
+ */
+export function extractContentTag(message: string): string {
+  const match = message.match(/<content>([\s\S]*?)<\/content>/);
+  return match ? match[1].trim() : '';
+}
+
+/**
+ * 从消息中提取 <content>...</content> 标签内的纯文本对话内容
+ * 提取对话台词、旁白等纯文本，过滤掉格式标记
+ */
+export function extractPlainTextFromContent(message: string): string {
+  const content = extractContentTag(message);
+  if (!content) return '';
+
+  const lines: string[] = [];
+
+  // 匹配所有 [[...]] 块
+  const blockRegex = /\[\[.*?\]\]/gs;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = blockRegex.exec(content)) !== null) {
+    // 提取格式块之间的纯文本（作为旁白）
+    const between = content.slice(lastIndex, match.index).trim();
+    if (between) {
+      lines.push(between);
+    }
+
+    // 解析格式块中的文本
+    const blockText = match[0];
+    const innerMatch = blockText.match(/^\[\[\w+\|\|(.*?)\]\]$/s);
+    if (innerMatch) {
+      const pairs = innerMatch[1].split('||');
+      for (const pair of pairs) {
+        const colonMatch = pair.match(/^([^:：]+)[:：](.*)$/);
+        if (colonMatch) {
+          const key = colonMatch[1].trim();
+          const value = colonMatch[2].trim();
+          // 只提取有意义的文本内容
+          if (['台词', '旁白', '黑屏文字'].includes(key) && value) {
+            lines.push(value);
+          }
+        }
+      }
+    }
+
+    lastIndex = blockRegex.lastIndex;
+  }
+
+  // 处理最后剩余的文本
+  const remaining = content.slice(lastIndex).trim();
+  if (remaining) {
+    lines.push(remaining);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * 解析消息为消息块数组
+ *
+ * 解析规则：
+ * 1. 仅解析 <content>...</content> 标签内的内容，标签外的内容全部忽略
+ * 2. 若消息中没有 <content> 标签，返回空数组（VN 主舞台不显示任何内容）
+ * 3. 标签内按 [[...]] 格式解析对话块；无格式文本视为旁白
  */
 export async function parseMessageBlocks(message: string, lastScene?: string): Promise<MessageBlock[]> {
   console.info('[MessageParser] 开始解析消息:', message.substring(0, 100));
+
+  const contentText = extractContentTag(message);
+  if (!contentText) {
+    console.info('[MessageParser] 消息中没有 <content> 标签，忽略不显示');
+    return [];
+  }
+
+  console.info('[MessageParser] 提取到 <content> 内容:', contentText.substring(0, 200));
 
   const resources = await loadWorldbookResources();
   const blocks: MessageBlock[] = [];
 
   // 匹配所有 [[...]] 块
   const blockRegex = /\[\[.*?\]\]/gs;
-  const matches = message.match(blockRegex);
+  const matches = contentText.match(blockRegex);
 
   if (!matches || matches.length === 0) {
-    // 没有找到格式化块，返回纯文本块
-    console.info('[MessageParser] 未找到格式化块，返回纯文本');
+    // 没有找到格式化块，返回纯文本作为旁白
+    console.info('[MessageParser] <content> 内未找到格式化块，返回纯文本旁白');
     return [
       {
         type: 'narration',
-        message: message.trim(),
+        message: contentText.trim(),
       },
     ];
   }

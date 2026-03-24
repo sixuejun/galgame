@@ -18,12 +18,18 @@
   耐力: {{get_message_variable::stat_data.个人属性.耐力}}  # 数值。[0,5]，影响<user>长时间行动或逃生时表现
   特殊能力: {{get_message_variable::stat_data.个人属性.特殊能力}}  # 字符串数组。描述额外能力与限制。
 
+收集物: {{get_message_variable::stat_data.收集物}}  # 对象。玩家当前持有的物品，键为物品名称，值为相关描述或者说明。
+
+记事簿:  # 对象。总结和记录曾经发生过的有纪念意义事情的记事本。
+  进行中: {{get_message_variable::stat_data.记事簿.进行中}}  # 字符串数组。正在进行的任务或事件。
+  已完成: {{get_message_variable::stat_data.记事簿.已完成}}  # 字符串数组。已完成的有纪念意义的事情。
+
 角色:  # 对象。动态角色系统，遇到新角色时添加。
   [姓名]:
     末世前职业: {{get_message_variable::stat_data.角色.[姓名].末世前职业}}  # 字符串。该角色在世界崩坏前的职业或身份
     与user的关系: {{get_message_variable::stat_data.角色.[姓名].与user的关系}}  # 字符串。描述角色与<user>的关系
     羁绊值: {{get_message_variable::stat_data.角色.[姓名].羁绊值}}  # 数值。范围[0,100]，表示与<user>的亲密程度，每次变动控制在[-5, +5]范围内
-    能力: {{get_message_variable::stat_data.角色.[姓名].羁绊值}}  # 字符串。角色所拥有的才能、天赋或者能力，允许为无
+    能力: {{get_message_variable::stat_data.角色.[姓名].能力}}  # 字符串。角色所拥有的才能、天赋或者能力，允许为无
     状态: {{get_message_variable::stat_data.角色.[姓名].状态}}  # 字符串。角色当前的状态描述
 
 殷姒:  # 对象。顶层可扩展。殷姒的实时状态。
@@ -50,7 +56,7 @@
 
 剧情:  # 对象。剧情进展相关。
   当前事件: {{get_message_variable::stat_data.剧情.当前事件}}  # 字符串。当前正在发生的事件
-  事件大纲: {{get_message_variable::stat_data.剧情.事件大纲}}  # 字符串。事件的简要大纲
+  事件大纲: {{get_message_variable::stat_data.剧情.事件大纲}}  # 字符串。剧情的简要大纲。
 ```
 同时，我还注意到，这是一个**末日背景下的恋爱喜剧故事**，且故事内核是悲剧。现在，我应该明确区分所有角色的设定，并对个人进行回应。
 我还没有进行本次变量更新，所以我必须在下一次写作完成后，在末尾添加变量更新。

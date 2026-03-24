@@ -29,4 +29,7 @@
       '状态': { '心情': ['淡然'], '身体': ['健康'], '行动': ['翻阅书籍'] },
     },
   '剧情': { '当前事件': ['无'], '事件大纲': ['无'] },
+  'vn_task_danmaku': false,
+  'vn_task_imageGen': false,
+  'vn_task_shop': false,
 }
