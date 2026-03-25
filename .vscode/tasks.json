@@ -2,6 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
+<<<<<<< HEAD
       "label": "在 5500 端口启动静态服务",
       "type": "shell",
       "command": "pnpm",
@@ -27,6 +28,8 @@
       "isBackground": true
     },
     {
+=======
+>>>>>>> b80a86e4d72312ede7f291df2c1c65bd1f7e93eb
       "label": "开始监听源代码并编译",
       "type": "shell",
       "command": "pnpm",
@@ -68,8 +71,12 @@
     {
       "label": "开始任务",
       "dependsOn": [
+<<<<<<< HEAD
         "在 5500 端口启动静态服务",
         "开始监听源代码并编译"
+=======
+        "开始监听源代码并编译",
+>>>>>>> b80a86e4d72312ede7f291df2c1c65bd1f7e93eb
       ]
     },
     {

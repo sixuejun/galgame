@@ -3,7 +3,10 @@
     "build:dev": "webpack --mode development",
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch --progress",
+<<<<<<< HEAD
     "dev:serve": "http-server . -p 5500 --cors -c-1",
+=======
+>>>>>>> b80a86e4d72312ede7f291df2c1c65bd1f7e93eb
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,html,vue}\" --no-error-on-unmatched-pattern",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
@@ -43,7 +46,10 @@
     "html-loader": "^5.1.0",
     "html-webpack-inline-svg-plugin": "^2.3.0",
     "html-webpack-plugin": "^5.6.6",
+<<<<<<< HEAD
     "http-server": "^14.1.1",
+=======
+>>>>>>> b80a86e4d72312ede7f291df2c1c65bd1f7e93eb
     "javascript-obfuscator": "^4.2.2",
     "mini-css-extract-plugin": "^2.10.1",
     "postcss": "^8.5.8",
@@ -98,7 +104,10 @@
     "pixi.js": "^8.17.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+<<<<<<< HEAD
     "screenfull": "^6.0.2",
+=======
+>>>>>>> b80a86e4d72312ede7f291df2c1c65bd1f7e93eb
     "toastr": "^2.1.4",
     "vue": "^3.5.30",
     "vue-final-modal": "^4.5.5",
