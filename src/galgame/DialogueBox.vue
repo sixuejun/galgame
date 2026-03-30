@@ -1,34 +1,37 @@
 <template>
-  <!-- 全屏黑屏文字转场效果 -->
-  <Transition
-    enter-active-class="transition-opacity duration-700"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-500"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="currentBlock?.type === 'blacktext'"
-      class="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black"
-    >
-      <div class="text-center max-w-2xl">
-        <p
-          ref="blacktextRef"
-          class="text-xl md:text-2xl leading-relaxed tracking-wide transition-opacity duration-500"
-          :class="isBlacktextVisible ? 'opacity-100' : 'opacity-0'"
-          style="color: rgba(212,197,160,0.9); font-family: inherit;"
-        >
-          {{ displayedText }}
-          <span
-            v-if="isTyping"
-            class="inline-block ml-0.5"
-            style="width:2px; height:1.2rem; background:rgba(212,197,160,0.8); animation: cursor-blink 1s infinite;"
-          />
-        </p>
+  <!-- 黑屏文字：全屏遮罩转场（不显示底部对话框） -->
+  <Teleport to="body">
+    <Transition name="blacktext-mask">
+      <div
+        v-if="currentBlock?.type === 'blacktext'"
+        class="vn-blacktext-overlay fixed inset-0 flex cursor-pointer items-center justify-center p-6 md:p-10"
+        style="z-index: 38"
+        @click="handleClickText"
+      >
+        <!-- 纯黑底 + 轻微颗粒感，增强「场次切换」感 -->
+        <div class="vn-blacktext-backdrop absolute inset-0 bg-black" aria-hidden="true" />
+        <div
+          class="vn-blacktext-grain pointer-events-none absolute inset-0 opacity-[0.07]"
+          aria-hidden="true"
+        />
+
+        <div class="relative z-10 max-w-3xl text-center">
+          <Transition name="blacktext-line">
+            <p
+              v-show="isBlacktextVisible"
+              class="vn-blacktext-text text-lg leading-relaxed tracking-widest md:text-2xl md:leading-relaxed"
+            >
+              {{ displayedText }}
+              <span
+                v-if="isTyping"
+                class="vn-blacktext-caret ml-0.5 inline-block align-middle"
+              />
+            </p>
+          </Transition>
+        </div>
       </div>
-    </div>
-  </Transition>
+    </Transition>
+  </Teleport>
 
   <!-- 普通对话框（非黑屏文字） -->
   <div v-if="currentBlock && currentBlock.type !== 'blacktext'" class="relative w-full" @click="handleClickText">
@@ -42,40 +45,61 @@
         }"
       >
         <!-- Top decorative lines -->
-        <div :style="{ height:'3px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.4), transparent)' }" />
-        <div :style="{ height:'1px', marginTop:'2px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
+        <div
+          :style="{
+            height: '3px',
+            opacity: 0.2,
+            background: 'linear-gradient(to right, transparent, rgba(212,197,160,0.4), transparent)',
+          }"
+        />
+        <div
+          :style="{
+            height: '1px',
+            marginTop: '2px',
+            background: 'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)',
+          }"
+        />
 
         <div class="flex items-stretch">
           <!-- Prev arrow -->
           <button
-            class="dialogue-nav-arrow shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
-            :class="isFirstBlock ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
+            class="dialogue-nav-arrow flex w-8 shrink-0 items-center justify-center transition-opacity duration-200"
+            :class="isFirstBlock ? 'cursor-not-allowed opacity-20' : 'cursor-pointer opacity-60 hover:opacity-100'"
             :disabled="isFirstBlock"
             @click.stop="!isFirstBlock && prevBlock()"
           >
-            <i class="fa-solid fa-chevron-left" style="font-size:0.85rem; color:var(--vn-fg);" />
+            <i class="fa-solid fa-chevron-left" style="font-size: 0.85rem; color: var(--vn-fg)" />
           </button>
 
           <!-- Text area -->
-          <div class="flex-1 py-4 px-3 md:px-5 min-w-0">
+          <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-4 md:px-5">
             <!-- Character name -->
-            <div v-if="currentBlock.type === 'character' && currentBlock.character" class="mb-2 flex items-center gap-2">
-              <span style="color:var(--rust); font-weight:bold; font-size:0.875rem; letter-spacing:0.1em;">
+            <div
+              v-if="currentBlock.type === 'character' && currentBlock.character"
+              class="mb-2 flex items-center gap-2"
+            >
+              <span style="color: var(--rust); font-weight: bold; font-size: 0.875rem; letter-spacing: 0.1em">
                 {{ currentBlock.character }}
               </span>
-              <div class="flex-1" :style="{ height:'1px', background:'linear-gradient(to right, rgba(139,69,19,0.3), transparent)' }" />
+              <div
+                class="flex-1"
+                :style="{ height: '1px', background: 'linear-gradient(to right, rgba(139,69,19,0.3), transparent)' }"
+              />
             </div>
 
             <!-- Narration indicator -->
             <div v-if="currentBlock.type === 'narration'" class="mb-2 flex items-center gap-2">
-              <div style="width:8px; height:8px; background:rgba(139,69,19,0.4); transform:rotate(45deg);" />
-              <div class="flex-1" :style="{ height:'1px', background:'linear-gradient(to right, rgba(212,197,160,0.1), transparent)' }" />
+              <div style="width: 8px; height: 8px; background: rgba(139, 69, 19, 0.4); transform: rotate(45deg)" />
+              <div
+                class="flex-1"
+                :style="{ height: '1px', background: 'linear-gradient(to right, rgba(212,197,160,0.1), transparent)' }"
+              />
             </div>
 
             <!-- Text content -->
-            <div ref="textRef" class="max-h-28 md:max-h-36 overflow-y-auto no-scrollbar" @scroll="handleTextScroll">
+            <div ref="textRef" class="no-scrollbar max-h-28 overflow-y-auto md:max-h-36" @scroll="handleTextScroll">
               <p
-                class="text-sm md:text-base leading-relaxed tracking-wide"
+                class="text-sm leading-relaxed tracking-wide md:text-base"
                 :style="{
                   color: getTextColor(),
                   fontStyle: currentBlock.type === 'narration' ? 'italic' : 'normal',
@@ -85,8 +109,8 @@
                 {{ displayedText }}
                 <span
                   v-if="isTyping"
-                  class="inline-block ml-0.5"
-                  style="width:2px; height:1rem; background:var(--rust); animation: cursor-blink 1s infinite;"
+                  class="ml-0.5 inline-block"
+                  style="width: 2px; height: 1rem; background: var(--rust); animation: cursor-blink 1s infinite"
                 />
               </p>
             </div>
@@ -94,21 +118,39 @@
 
           <!-- Next arrow -->
           <button
-            class="dialogue-nav-arrow shrink-0 w-8 flex items-center justify-center transition-opacity duration-200"
-            :class="isLastBlock || hasChoices ? 'opacity-20 cursor-not-allowed' : 'opacity-60 hover:opacity-100 cursor-pointer'"
+            class="dialogue-nav-arrow flex w-8 shrink-0 items-center justify-center transition-opacity duration-200"
+            :class="
+              isLastBlock || hasChoices
+                ? 'cursor-not-allowed opacity-20'
+                : 'cursor-pointer opacity-60 hover:opacity-100'
+            "
             :disabled="isLastBlock || hasChoices"
             @click.stop="!isLastBlock && !hasChoices && nextBlock()"
           >
-            <i class="fa-solid fa-chevron-right" style="font-size:0.85rem; color:var(--vn-fg);" />
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.85rem; color: var(--vn-fg)" />
           </button>
         </div>
 
         <!-- Bottom decorative lines -->
-        <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
-        <div :style="{ height:'2px', marginTop:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.3), transparent)' }" />
+        <div
+          :style="{
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)',
+          }"
+        />
+        <div
+          :style="{
+            height: '2px',
+            marginTop: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(212,197,160,0.3), transparent)',
+          }"
+        />
 
         <!-- Block counter -->
-        <div class="absolute bottom-1 right-3" style="font-size:10px; color:var(--vn-muted); font-family:monospace; opacity:0.4;">
+        <div
+          class="absolute right-3 bottom-1"
+          style="font-size: 10px; color: var(--vn-muted); font-family: monospace; opacity: 0.4"
+        >
           {{ store.currentDialogueIndex + 1 }}/{{ store.currentMessageBlocks.length }}
         </div>
       </div>
@@ -126,13 +168,15 @@ const props = defineProps<{
 
 const store = useVNStore();
 const textRef = ref<HTMLDivElement | null>(null);
-const blacktextRef = ref<HTMLParagraphElement | null>(null);
 const isManualScroll = ref(false);
 
 const displayedText = ref('');
 const isTyping = ref(false);
 const isBlacktextVisible = ref(false);
 let typingTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 黑屏遮罩淡入后再开始打字（与 CSS 时长一致） */
+const BLACKTEXT_MASK_IN_MS = 520;
 
 const currentBlock = computed(() => store.currentBlock);
 const isFirstBlock = computed(() => store.currentDialogueIndex === 0);
@@ -151,8 +195,6 @@ function getTextColor() {
   if (!currentBlock.value) return 'rgba(212,197,160,0.9)';
 
   switch (currentBlock.value.type) {
-    case 'blacktext':
-      return 'rgba(212,197,160,0.9)';
     case 'narration':
       return 'rgba(212,197,160,0.7)';
     case 'user':
@@ -170,6 +212,7 @@ function getBlockText() {
     case 'character':
       return currentBlock.value.text || '';
     case 'narration':
+      return currentBlock.value.message || '';
     case 'blacktext':
       return currentBlock.value.message || '';
     case 'user':
@@ -181,7 +224,7 @@ function getBlockText() {
 
 watch(
   currentBlock,
-  (block) => {
+  block => {
     if (!block) return;
     if (typingTimer) clearTimeout(typingTimer);
 
@@ -196,11 +239,10 @@ watch(
     if (charDelay === 0) {
       displayedText.value = fullText;
       isTyping.value = false;
-      // 黑屏文字：等待过渡动画完成后淡入文字
       if (block.type === 'blacktext') {
         setTimeout(() => {
           isBlacktextVisible.value = true;
-        }, 100);
+        }, BLACKTEXT_MASK_IN_MS);
       }
       return;
     }
@@ -215,12 +257,11 @@ watch(
       }
     };
 
-    // 黑屏文字：等待过渡动画完成后开始打字
     if (block.type === 'blacktext') {
       setTimeout(() => {
         isBlacktextVisible.value = true;
         typingTimer = setTimeout(typeNext, charDelay);
-      }, 100);
+      }, BLACKTEXT_MASK_IN_MS);
     } else {
       typingTimer = setTimeout(typeNext, charDelay);
     }
@@ -235,7 +276,8 @@ watch(displayedText, () => {
 });
 
 watch(
-  () => [store.settings.autoPlay, isTyping.value, hasChoices.value, isLastBlock.value, store.currentDialogueIndex] as const,
+  () =>
+    [store.settings.autoPlay, isTyping.value, hasChoices.value, isLastBlock.value, store.currentDialogueIndex] as const,
   ([autoPlay, typing, choices, last]) => {
     if (!autoPlay || typing || choices || last) return;
     const delay = Math.max(500, 5000 - store.settings.autoPlaySpeed * 400);
@@ -246,11 +288,12 @@ watch(
 
 function handleTextScroll() {
   isManualScroll.value = true;
-  setTimeout(() => { isManualScroll.value = false; }, 3000);
+  setTimeout(() => {
+    isManualScroll.value = false;
+  }, 3000);
 }
 
 function handleClickText() {
-  // 黑屏文字块：点击直接进入下一个
   if (currentBlock.value?.type === 'blacktext') {
     if (isTyping.value) {
       if (typingTimer) clearTimeout(typingTimer);
@@ -279,5 +322,42 @@ onUnmounted(() => {
 <style scoped>
 .dialogue-nav-arrow:hover:not(:disabled) {
   background: rgba(212, 197, 160, 0.05);
+}
+
+/* 全屏黑遮罩：淡入淡出转场 */
+.blacktext-mask-enter-active,
+.blacktext-mask-leave-active {
+  transition: opacity 0.5s ease;
+}
+.blacktext-mask-enter-from,
+.blacktext-mask-leave-to {
+  opacity: 0;
+}
+
+/* 文字行：略晚于遮罩出现 */
+.blacktext-line-enter-active {
+  transition: opacity 0.45s ease 0.12s, transform 0.45s ease 0.12s;
+}
+.blacktext-line-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.vn-blacktext-text {
+  color: rgba(250, 248, 240, 0.95);
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  text-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+}
+
+.vn-blacktext-caret {
+  width: 2px;
+  height: 1.1em;
+  background: rgba(250, 248, 240, 0.85);
+  animation: cursor-blink 1s infinite;
+}
+
+.vn-blacktext-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
 }
 </style>
