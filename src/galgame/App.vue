@@ -1,20 +1,16 @@
 <template>
-  <main
-    ref="mainEl"
-    class="relative w-full select-none"
-    :style="{ background: 'var(--vn-bg)', aspectRatio: '16/9', minHeight: '0' }"
-  >
+  <main ref="mainEl" class="relative w-full select-none" :style="mainStyle">
     <StageArea />
 
     <!-- Image Deck (扇形卡牌队列) -->
-    <ImageDeck v-if="showImageDeck" />
+    <ImageDeck />
 
-    <div class="pointer-events-none absolute inset-0 flex flex-col" style="z-index: 20; min-height: 0">
-      <div class="pointer-events-auto flex-shrink-0">
+    <div class="pointer-events-none absolute inset-0 flex flex-col" :style="overlayContainerStyle">
+      <div class="pointer-events-auto shrink-0">
         <QuickAccessMenu :is-fullscreen="isFullscreen" @toggle-fullscreen="toggleFullscreen" />
       </div>
       <div class="min-h-0 flex-1" />
-      <div class="pointer-events-auto flex-shrink-0 pb-6 md:pb-8">
+      <div class="pointer-events-auto shrink-0 pb-6 md:pb-8" :style="dialogueBoxStyle">
         <DialogueBox :choices="choices" :during-streaming="context.during_streaming" />
       </div>
     </div>
@@ -44,6 +40,12 @@
         </div>
       </div>
     </div>
+
+    <!-- 生图测试控制台 -->
+    <ImageGenConsole />
+
+    <!-- 重试生图面板 -->
+    <ImageGenRetryPanel />
   </main>
 </template>
 
@@ -55,24 +57,56 @@ import DialogueBox from './DialogueBox.vue';
 import GameplayPanel from './GameplayPanel.vue';
 import HistoryPanel from './HistoryPanel.vue';
 import ImageDeck from './ImageDeck.vue';
+import ImageGenConsole from './ImageGenConsole.vue';
+import ImageGenRetryPanel from './ImageGenRetryPanel.vue';
 import QuickAccessMenu from './QuickAccessMenu.vue';
 import SettingsPanel from './SettingsPanel.vue';
 import StageArea from './StageArea.vue';
 import { parseChoices, useVNStore } from './store';
+import { extractImageTagBlocks } from './utils/messageParser';
 
 const context = injectStreamingMessageContext();
 const store = useVNStore();
 const mainEl = ref<HTMLElement | null>(null);
 
-// 显示扇形卡牌队列的条件：同时打开背景和CG生图开关
-const showImageDeck = computed(() => {
-  return (
-    store.settings.imageGenEnabled &&
-    store.settings.backgroundGenEnabled &&
-    store.settings.cgGenEnabled &&
-    store.imageCardQueue.length > 0
-  );
+// 竖屏模式判断
+const isPortraitMode = computed(() => store.settings.portraitMode);
+
+// 主容器样式：仅用 width + aspect-ratio 决定高度（iframe 内禁止 vh，避免与比例冲突把宽度压成细条）
+const mainStyle = computed(() => {
+  if (isPortraitMode.value) {
+    return {
+      background: 'var(--vn-bg)',
+      width: '100%',
+      aspectRatio: '3 / 4',
+      boxSizing: 'border-box' as const,
+    };
+  }
+  return {
+    background: 'var(--vn-bg)',
+    width: '100%',
+    aspectRatio: '16 / 9',
+    boxSizing: 'border-box' as const,
+  };
 });
+
+// 覆盖层容器样式：竖屏模式下调整位置
+const overlayContainerStyle = computed(() => {
+  if (isPortraitMode.value) {
+    return { zIndex: 20, minHeight: 0 };
+  }
+  return { zIndex: 20, minHeight: 0 };
+});
+
+// 对话框样式：竖屏模式下调整位置到底部中央
+const dialogueBoxStyle = computed(() => {
+  if (isPortraitMode.value) {
+    return { paddingLeft: '1rem', paddingRight: '1rem' };
+  }
+  return {};
+});
+
+// 显示扇形卡牌队列由 ImageDeck 组件自身控制（仅依赖开关）
 
 function getFullscreenDoc(): Document | null {
   if (document.fullscreenElement) return document;
@@ -85,6 +119,7 @@ function getFullscreenDoc(): Document | null {
 }
 
 const isFullscreen = ref(!!getFullscreenDoc());
+let isTransitioning = false;
 
 const choices = computed(() => parseChoices(context.message));
 
@@ -96,6 +131,11 @@ watch(
   async newMessage => {
     if (newMessage) {
       await store.parseCurrentMessage(newMessage);
+      // 解析并处理图像标签块
+      const imageTagBlocks = extractImageTagBlocks(newMessage);
+      if (imageTagBlocks.length > 0) {
+        await store.processImageTagBlocks(imageTagBlocks);
+      }
     }
   },
   { immediate: true },
@@ -120,38 +160,28 @@ watch(
 
 function handleFullscreenChange() {
   isFullscreen.value = !!getFullscreenDoc();
+  isTransitioning = false;
 }
 
 async function toggleFullscreen() {
-  try {
-    if (isFullscreen.value) {
-      // 退出全屏：先试当前 document，再试父 document（iframe 内全屏可能在父页面上）
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        try {
-          if (window.parent !== window && window.parent.document?.fullscreenElement) {
-            await window.parent.document.exitFullscreen();
-          }
-        } catch {
-          /* 跨域时 parent 不可访问 */
-        }
-      }
-      isFullscreen.value = false;
-      return;
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  const currentDoc = getFullscreenDoc();
+  if (currentDoc) {
+    try {
+      await currentDoc.exitFullscreen();
+    } catch {
+      isTransitioning = false;
     }
-    const fsDoc = getFullscreenDoc();
-    if (fsDoc) {
-      await fsDoc.exitFullscreen();
-      isFullscreen.value = false;
-      return;
-    }
-    if (mainEl.value) {
+  } else if (mainEl.value) {
+    try {
       await mainEl.value.requestFullscreen();
-      isFullscreen.value = true;
+    } catch {
+      isTransitioning = false;
     }
-  } catch (e) {
-    console.warn('全屏切换失败:', e);
+  } else {
+    isTransitioning = false;
   }
 }
 
@@ -180,6 +210,7 @@ onMounted(() => {
   } catch {
     /* 跨域时忽略 */
   }
+
   (
     window as unknown as {
       __galgameState?: { activeGenerationMesId: number | null; mainStore: ReturnType<typeof useVNStore> | null };

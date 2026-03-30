@@ -1,14 +1,10 @@
 <template>
-  <div v-if="choices.length > 0" class="absolute inset-0" style="z-index:30;" @click="handleBackdropClick">
+  <div v-if="choices.length > 0" class="absolute inset-0" style="z-index: 30" @click="handleBackdropClick">
     <!-- Backdrop -->
-    <div class="absolute inset-0" style="background:rgba(42,36,32,0.3);" />
+    <div class="absolute inset-0" style="background: rgba(42, 36, 32, 0.3)" />
 
     <!-- Choice list -->
-    <div
-      class="absolute left-1/2 -translate-x-1/2 w-full max-w-lg px-4"
-      style="bottom: 11rem;"
-      @click.stop
-    >
+    <div class="absolute left-1/2 -translate-x-1/2 w-full max-w-lg px-4" style="bottom: 11rem" @click.stop>
       <div class="flex flex-col gap-2">
         <!-- Board Game Entry (always visible) -->
         <button
@@ -23,18 +19,32 @@
           :disabled="store.choiceLocked"
           @click.stop="handleBoardGameClick"
         >
-          <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(196,162,101,0.3), transparent)' }" />
+          <div
+            :style="{
+              height: '1px',
+              background: 'linear-gradient(to right, transparent, rgba(196,162,101,0.3), transparent)',
+            }"
+          />
           <div class="p-3 flex items-center gap-3">
-            <i class="fa-solid fa-dice-d6" style="color:var(--stain); font-size:0.875rem;" />
-            <span class="text-sm" style="color:rgba(196,162,101,0.9); font-weight:500;">投个骰子</span>
-            <span style="font-size:9px; color:rgba(139,125,107,0.5); margin-left:auto; font-family:monospace;">废土行路</span>
+            <i class="fa-solid fa-dice-d6" style="color: var(--stain); font-size: 0.875rem" />
+            <span class="text-sm" style="color: rgba(196, 162, 101, 0.9); font-weight: 500">投个骰子</span>
+            <span style="font-size: 9px; color: rgba(139, 125, 107, 0.5); margin-left: auto; font-family: monospace"
+              >废土行路</span
+            >
           </div>
         </button>
 
         <!-- Temp options from board game -->
         <template v-if="store.tempOptions.length > 0">
           <div
-            style="font-size:9px; color:var(--stain); font-family:monospace; text-align:center; padding:4px 0; letter-spacing:0.1em;"
+            style="
+              font-size: 9px;
+              color: var(--stain);
+              font-family: monospace;
+              text-align: center;
+              padding: 4px 0;
+              letter-spacing: 0.1em;
+            "
           >
             ◈ 事件选项 ◈
           </div>
@@ -52,12 +62,17 @@
             :disabled="store.choiceLocked"
             @click.stop="handleSelect(option.choiceId)"
           >
-            <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(196,162,101,0.3), transparent)' }" />
+            <div
+              :style="{
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, rgba(196,162,101,0.3), transparent)',
+              }"
+            />
             <div class="p-3 flex items-center gap-3">
-              <span style="color:var(--stain); font-family:monospace; font-size:0.75rem; opacity:0.6;">
+              <span style="color: var(--stain); font-family: monospace; font-size: 0.75rem; opacity: 0.6">
                 {{ String.fromCharCode(65 + index) }}.
               </span>
-              <span class="text-sm" style="color:rgba(212,197,160,0.9);">{{ option.text }}</span>
+              <span class="text-sm" style="color: rgba(212, 197, 160, 0.9)">{{ option.text }}</span>
             </div>
           </button>
         </template>
@@ -75,29 +90,35 @@
             }"
             @click="handleSelect(choice.choiceId)"
           >
-            <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
-            <div class="p-3 flex items-center gap-3">
-              <span style="color:var(--rust); font-family:monospace; font-size:0.75rem; opacity:0.5;">
+            <div
+              :style="{
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)',
+              }"
+            />
+            <div class="p-3 flex items-start gap-3">
+              <span style="color: var(--rust); font-family: monospace; font-size: 0.75rem; opacity: 0.5; padding-top: 2px">
                 {{ String.fromCharCode(65 + index) }}.
               </span>
-              <input
+              <textarea
                 ref="inputRef"
-                type="text"
                 :value="store.customInputText"
-                placeholder="自由输入..."
-                class="flex-1 bg-transparent text-sm outline-none"
-                :style="{ color:'rgba(212,197,160,0.9)', fontFamily:'serif' }"
+                placeholder="自由输入...（支持 \n 换行）"
+                rows="2"
+                class="flex-1 bg-transparent text-sm outline-none resize-none"
+                :style="{ color: 'rgba(212,197,160,0.9)', fontFamily: 'serif', minHeight: '2.5rem' }"
                 @input="handleCustomInput"
-                @keydown.enter="handleCustomSubmit"
+                @keydown.enter.ctrl="handleCustomSubmit"
+                @keydown.enter.exact.prevent
                 @click.stop="!isSelected(choice.choiceId) && handleSelect(choice.choiceId)"
               />
               <button
                 v-if="store.customInputText.trim()"
-                class="cursor-pointer transition-colors"
-                style="color:var(--rust);"
+                class="cursor-pointer transition-colors mt-1"
+                style="color: var(--rust)"
                 @click.stop="handleCustomSubmit"
               >
-                <i class="fa-solid fa-paper-plane" style="font-size:0.875rem;" />
+                <i class="fa-solid fa-paper-plane" style="font-size: 0.875rem" />
               </button>
             </div>
           </div>
@@ -116,12 +137,17 @@
             :disabled="store.choiceLocked"
             @click.stop="handleSelect(choice.choiceId)"
           >
-            <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
+            <div
+              :style="{
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)',
+              }"
+            />
             <div class="p-3 flex items-center gap-3">
-              <span style="color:var(--rust); font-family:monospace; font-size:0.75rem; opacity:0.5;">
+              <span style="color: var(--rust); font-family: monospace; font-size: 0.75rem; opacity: 0.5">
                 {{ String.fromCharCode(65 + index) }}.
               </span>
-              <span class="text-sm" style="color:rgba(212,197,160,0.9);">{{ choice.text }}</span>
+              <span class="text-sm" style="color: rgba(212, 197, 160, 0.9)">{{ choice.text }}</span>
             </div>
           </button>
         </template>
@@ -188,7 +214,8 @@ function handleCustomInput(e: Event) {
 function handleCustomSubmit() {
   if (!store.customInputText.trim() || store.choiceLocked) return;
   store.lockChoice();
-  const text = store.customInputText.trim();
+  // 支持 \n 转义为真实换行
+  const text = store.customInputText.replace(/\\n/g, '\n').trim();
   setTimeout(() => {
     emit('choiceSubmitted', 'custom', text);
     store.clearChoices();

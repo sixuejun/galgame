@@ -164,7 +164,7 @@ async function handleStart() {
 .riddle-contact-card {
   border: 1px solid rgba(90, 79, 64, 0.2);
   border-radius: 8px;
-  min-height: 90px;
+  min-height: 70px;
   padding: 12px 8px;
   background: transparent;
   cursor: pointer;
@@ -251,7 +251,45 @@ async function handleStart() {
   }
 
   .riddle-contact-card {
-    min-height: 84px;
+    min-height: 65px;
+  }
+}
+
+/* 竖屏模式适配 */
+@media (max-height: 600px) {
+  .riddle-launch {
+    gap: 6px;
+  }
+
+  .riddle-contact-head {
+    margin-bottom: 4px;
+  }
+
+  .riddle-contact-card {
+    min-height: 55px;
+    padding: 8px 6px;
+  }
+
+  .riddle-contact-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .riddle-wrap-line {
+    margin-top: 4px;
+  }
+
+  .riddle-action {
+    gap: 6px;
+  }
+
+  .riddle-input {
+    height: 28px;
+  }
+
+  .riddle-start-btn {
+    padding: 6px 10px;
   }
 }
 </style>

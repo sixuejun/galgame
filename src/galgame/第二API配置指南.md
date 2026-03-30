@@ -1,5 +1,12 @@
 # 第二 API 配置指南
 
+> 末日报纸风 Galgame 第二 API 系统完整技术文档
+
+**版本**: 2.3.0  
+**最后更新**: 2026-03-25
+
+---
+
 ## 📋 概述
 
 第二 API 是一个**完全独立**的 API 配置系统，专门用于执行辅助任务（如弹幕生成、商店刷新、系统对话、猜谜、生图标签生成等），与主 API 完全分离，互不影响。
@@ -94,6 +101,7 @@
 | `vn_task_shop`     | 商店物品生成 | 刷新商店时           |
 | `vn_task_riddle`   | 谜题 AI 回复 | 猜谜游戏中 AI 回复时 |
 | `vn_task_system`   | 系统聊天     | 系统联系人对话时     |
+| `vn_task_boardGameEvent` | 废土行路事件生成 | 生成废土行路事件时 |
 
 **重要**：这些变量由系统自动管理，你**不需要手动设置**，只需要在预设中使用 EJS 语法读取它们。
 
@@ -232,32 +240,158 @@ background, post-apocalyptic, wasteland, ruins
 - 引用区间时，系统会获取该区间内所有消息
 - 引用内容会自动去除 HTML 标签，只保留纯文本
 
-### 5. API 任务分配
+---
 
-你可以为每个任务指定使用哪个 API，提供最大的灵活性。
+## 🔬 技术实现详解
 
-#### 可配置的任务
+### 核心代码位置
 
-| 任务         | 说明                     | 默认值   |
-| ------------ | ------------------------ | -------- |
-| **弹幕生成** | 生成弹幕文案             | 第二 API |
-| **生图 Tag** | 根据场景生成图片标签     | 第二 API |
-| **变量更新** | 更新游戏变量（预留功能） | 主 API   |
+第二 API 的核心实现在 `store.ts` 的 `callSecondApi` 函数中，以下是关键代码逻辑：
 
-#### 配置选项
+```typescript:store.ts
+// 第二 API 统一入口函数（第 1044-1229 行）
+async function callSecondApi(
+  task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'imageTag' | 'danmakuAndImageGen',
+  payload: SecondApiPayload,
+): Promise<string[] | ShopItem[] | string>
+```
 
-每个任务有三个选项：
+### 任务类型与调用方式
 
-- **主 API**：使用酒馆主界面配置的 API
-- **第二 API**：使用第二 API 配置
-- **禁用**：不执行该任务
+| 任务类型 | 调用函数 | 预设使用 | 提示词构造 |
+|----------|----------|----------|------------|
+| `danmaku` | `triggerDanmakuForMessage` (index.ts) | ✅ 使用 EJS | 用户输入剧情文本 |
+| `imageTag` | `triggerDanmakuAndImageGen` (index.ts) | ✅ 使用 EJS | 用户输入剧情文本 |
+| `shop` | `refreshShop` (store.ts) | ✅ 使用 EJS | 仅使用系统提示 |
+| `system` | `sendSystemUserMessage` (store.ts) | ❌ 代码构造 | 系统角色 + 历史 |
+| `riddle` | `requestRiddleAiReply` (store.ts) | ❌ 代码构造 | 角色 + 规则 + 对话 |
+| `boardGameEvent` | `generateBoardGameEvent` (store.ts) | ✅ 使用 EJS | 当前场景 + 事件类型 |
+| `danmakuAndImageGen` | `triggerDanmakuAndImageGen` (index.ts) | ✅ 使用 EJS | 用户输入剧情文本 |
+| `danmakuAndImageGen` | `triggerDanmakuAndImageGen` (index.ts) | ✅ 使用 EJS | 用户输入剧情文本 |
 
-#### 配置位置
+### 任务控制变量机制（核心）
 
-1. 打开设置面板
-2. 找到"第二 API"配置区域
-3. 点击"API 任务分配与生成历史"按钮
-4. 在弹出的面板中配置每个任务
+第二 API 使用聊天变量来控制预设中 EJS 的条件分支。这些变量通过 `secondApiTaskControl` ref 管理，并通过 `watchEffect` 同步到酒馆变量。
+
+#### 代码实现
+
+```typescript:store.ts（第 729-753 行）
+// 任务控制变量定义
+const secondApiTaskControl = ref({
+  danmaku: false,    // 弹幕生成任务
+  imageGen: false,   // 生图标签任务
+  shop: false,      // 商店物品任务
+  // riddle 和 system 任务不使用预设，无需任务控制变量
+});
+
+// 同步到聊天变量，供 EJS 使用
+watchEffect(() => {
+  insertOrAssignVariables(
+    {
+      vn_task_danmaku: secondApiTaskControl.value.danmaku,
+      vn_task_imageGen: secondApiTaskControl.value.imageGen,
+      vn_task_shop: secondApiTaskControl.value.shop,
+    },
+    { type: 'chat' },
+  );
+});
+```
+
+#### 调用流程
+
+```typescript:store.ts（第 1084-1107 行）
+// 1. 备份当前状态
+const taskControlBackup = { ...secondApiTaskControl.value };
+
+// 2. 重置所有任务开关为 false
+Object.keys(secondApiTaskControl.value).forEach(key => {
+  secondApiTaskControl.value[key as keyof typeof secondApiTaskControl.value] = false;
+});
+
+// 3. 根据任务类型开启对应开关
+if (task === 'danmaku') {
+  secondApiTaskControl.value.danmaku = true;
+} else if (task === 'imageTag') {
+  secondApiTaskControl.value.imageGen = true;
+} else if (task === 'shop') {
+  secondApiTaskControl.value.shop = true;
+} else if (task === 'danmakuAndImageGen') {
+  secondApiTaskControl.value.danmaku = true;
+  secondApiTaskControl.value.imageGen = true;
+}
+
+// 4. 等待变量同步（watchEffect 是异步的）
+await nextTick();
+
+// 5. 发送 API 请求（此时预设中的 EJS 会读取 vn_task_* 变量）
+```
+
+### 预设加载与恢复机制
+
+```typescript:store.ts（第 1069-1081 行）
+// 保存当前预设
+currentPreset = getLoadedPresetName();
+// 加载指定预设
+await loadPreset(presetName);
+// ... 调用 API ...
+// 恢复原预设
+await loadPreset(currentPreset);
+```
+
+### 世界书过滤机制
+
+调用第二 API 时，系统会临时禁用 `targetApi === 'main'` 的世界书条目，防止主 API 专用提示词干扰第二 API。
+
+```typescript:store.ts（第 1137-1143 行）
+// 过滤世界书条目，仅保留 targetApi 为 'second' 或 'both' 的条目
+let worldbookStates: WorldbookEntryState[] = [];
+try {
+  worldbookStates = await filterAndApplyWorldbookForSecondApi();
+} catch (e) {
+  console.warn('[SecondAPI] 世界书过滤失败，继续请求:', e);
+}
+```
+
+### 错误处理与重试
+
+```typescript:store.ts（第 1146-1203 行）
+const SECOND_API_TIMEOUT_MS = 30000;  // 超时时间
+const SECOND_API_RETRY_COUNT = 2;     // 重试次数
+
+// 智能降级
+const secondApiStatus = computed<ProviderStatus>(() => {
+  if (!settings.value.secondApiUrl || !settings.value.secondApiKey) return 'disabled';
+  if (secondApiStatusOverride.value === 'degraded') return 'degraded';
+  if (secondApiConsecutiveFailures.value >= SECOND_API_DEGRADED_THRESHOLD) return 'degraded';
+  return 'available';
+});
+```
+
+### 预设中 EJS 语法
+
+预设使用以下语法读取任务控制变量：
+
+```ejs
+<%# 弹幕生成任务 %>
+<% if (getvar('vn_task_danmaku')) { %>
+...弹幕生成提示词...
+<% } %>
+
+<%# 生图标签生成任务 %>
+<% if (getvar('vn_task_imageGen')) { %>
+...生图标签生成提示词...
+<% } %>
+
+<%# 弹幕+生图合并任务 %>
+<% if (getvar('vn_task_danmaku') && getvar('vn_task_imageGen')) { %>
+...合并提示词...
+<% } %>
+
+<%# 商店物品生成任务 %>
+<% if (getvar('vn_task_shop')) { %>
+...商店物品生成提示词...
+<% } %>
+```
 
 ---
 
@@ -1459,6 +1593,139 @@ AI：是香蕉！
 
 ---
 
+### 场景 8：废土行路事件生成
+
+#### 功能说明
+
+在废土行路模块中，当地图生成时，预先通过第二 API 为所有事件格子生成事件。玩家走到对应格子时，直接使用预生成的事件，无需等待实时生成。
+
+#### 触发条件
+
+1. 第二 API 已配置（`secondApiStatus = 'available'`）
+2. 废土行路模块中启用了"AI事件生成"开关
+3. 地图生成或刷新时自动触发
+
+#### 工作流程
+
+```
+1. 地图生成完成
+   ↓
+2. 收集所有事件格子（encounter、trap、fortune、transfer）
+   ↓
+3. 为每个事件格子调用第二 API（设置 vn_task_boardGameEvent = true）
+   ↓
+4. 预设中的 EJS 输出事件生成提示词
+   ↓
+5. 接收返回结果（JSON 格式的事件数据）
+   ↓
+6. 解析并缓存事件到 Map<nodeId, GameEvent>
+   ↓
+7. 玩家走到事件格子时，直接从缓存获取并显示
+```
+
+#### 输入内容说明
+
+系统会自动构建以下格式的输入内容：
+
+```
+当前场景：[当前剧情场景描述]
+事件类型：[encounter|trap|fortune|transfer]
+事件倾向：[根据类型自动设置]
+```
+
+- `encounter`：中性/随机
+- `trap`：负面/危险
+- `fortune`：正面/有利
+- `transfer`：中性/传送
+
+#### 预设示例
+
+```ejs
+<% if (getvar('vn_task_boardGameEvent')) { %>
+你是一个废土世界的事件生成器。根据以下信息生成一个事件。
+
+## 输入信息
+[系统会自动填充以下内容]
+当前场景：XXX
+事件类型：XXX
+事件倾向：XXX
+
+## 要求
+1. 生成一个符合事件倾向的事件
+2. 返回 JSON 格式，包含：
+   - title: 事件标题（简短，2-8字）
+   - flavor: 事件氛围描写（20-50字）
+   - cards: 3个选项数组，每个选项包含：
+     - title: 选项标题
+     - description: 选项描述
+     - effect: 效果描述（20字以内）
+     - hp: 生命值变化（整数，可为负数）
+     - sanity: 精神值变化（整数，可为负数）
+     - luck: 运气值变化（整数，可为负数）
+
+## JSON 格式示例
+{
+  "title": "废墟中的发现",
+  "flavor": "你在一堆废墟中发现了闪闪发光的东西...",
+  "cards": [
+    {
+      "title": "仔细搜查",
+      "description": "小心翼翼地搜索每个角落",
+      "effect": "仔细搜索可能会有收获",
+      "hp": 0,
+      "sanity": -5,
+      "luck": 2
+    },
+    {
+      "title": "快速通过",
+      "description": "这里太危险了，赶紧离开",
+      "effect": "安全第一，但可能错过什么",
+      "hp": 0,
+      "sanity": 0,
+      "luck": 0
+    },
+    {
+      "title": "大声呼喊",
+      "description": "也许这里还有其他人",
+      "effect": "可能引来敌人或同伴",
+      "hp": -10,
+      "sanity": 5,
+      "luck": 1
+    }
+  ]
+}
+<% } %>
+```
+
+#### 返回格式
+
+系统期望收到 JSON 格式的事件数据：
+
+```json
+{
+  "title": "事件标题",
+  "flavor": "事件氛围描写",
+  "cards": [
+    {
+      "title": "选项1标题",
+      "description": "选项1描述",
+      "effect": "效果描述",
+      "hp": 0,
+      "sanity": 0,
+      "luck": 1
+    }
+  ]
+}
+```
+
+#### 配置建议
+
+- **温度**：0.8（需要一定的随机性和创意）
+- **最大回复长度**：800（JSON 格式较长）
+- **模型选择**：GPT-3.5 或 GPT-4
+
+---
+
 ## 🐛 故障排除
 
 ### 问题 1：连接失败
@@ -1758,6 +2025,63 @@ IMAGE_TAG: background, post-apocalyptic, wasteland, ruins, abandoned building, d
 
 ```
 
+<% } %>
+
+<%# ======================================== %>
+<%# 任务 5：废土行路事件生成 %>
+<%# ======================================== %>
+<% if (getvar('vn_task_boardGameEvent')) { %>
+
+## 任务：废土行路事件生成
+
+你是一个废土世界的事件生成器。
+
+**输入信息**：
+- 当前场景：AI 会根据剧情自动填充
+- 事件类型：encounter | trap | fortune | transfer
+- 事件倾向：负面/危险 | 正面/有利 | 中性/随机 | 中性/传送
+
+**要求**：
+1. 根据事件类型和倾向生成对应的事件
+2. 返回 JSON 格式
+3. cards 数组必须包含 3 个选项
+4. 每个选项可以包含：hp（生命值）、sanity（精神值）、luck（运气值）的变化
+
+**示例输出**：
+```json
+{
+  "title": "废墟中的发现",
+  "flavor": "你在一堆废墟中发现了闪闪发光的东西...",
+  "cards": [
+    {
+      "title": "仔细搜查",
+      "description": "小心翼翼地搜索每个角落",
+      "effect": "可能会有收获",
+      "hp": 0,
+      "sanity": -5,
+      "luck": 2
+    },
+    {
+      "title": "快速通过",
+      "description": "这里太危险了，赶紧离开",
+      "effect": "安全第一",
+      "hp": 0,
+      "sanity": 0,
+      "luck": 0
+    },
+    {
+      "title": "大声呼喊",
+      "description": "也许这里还有其他人",
+      "effect": "可能引来敌人或同伴",
+      "hp": -10,
+      "sanity": 5,
+      "luck": 1
+    }
+  ]
+}
+```
+
+<% } %>
 
 ### 附录 B：常用模型对比
 
@@ -1779,11 +2103,12 @@ IMAGE_TAG: background, post-apocalyptic, wasteland, ruins, abandoned building, d
 
 #### 任务控制变量（自动管理）
 
-| 变量名             | 类型    | 说明             | 何时为 true          |
+| 变量名 | 类型 | 说明 | 何时为 true |
 | ------------------ | ------- | ---------------- | -------------------- |
-| `vn_task_danmaku`  | boolean | 弹幕生成任务     | 调用弹幕生成时       |
-| `vn_task_imageGen` | boolean | 生图标签生成任务 | 调用生图标签生成时   |
-| `vn_task_shop`     | boolean | 商店物品生成任务 | 刷新商店时           |
+| `vn_task_danmaku` | boolean | 弹幕生成任务 | 调用弹幕生成时 |
+| `vn_task_imageGen` | boolean | 生图标签生成任务 | 调用生图标签生成时 |
+| `vn_task_shop` | boolean | 商店物品生成任务 | 刷新商店时 |
+| `vn_task_boardGameEvent` | boolean | 废土行路事件生成任务 | 生成废土行路事件时 |
 
 #### 功能状态变量（用户控制）
 

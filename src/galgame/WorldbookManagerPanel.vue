@@ -2,7 +2,10 @@
   <div class="absolute inset-0 flex items-center justify-center" style="z-index: 50">
     <div class="absolute inset-0 backdrop-blur-sm" style="background: rgba(42, 36, 32, 0.7)" @click="$emit('close')" />
 
-    <div class="relative w-full max-w-3xl mx-4 border overflow-hidden animate-fade-in-up" :style="panelStyle">
+    <div
+      class="flex flex-col relative w-full max-w-3xl mx-4 border overflow-hidden animate-fade-in-up"
+      :style="panelStyle"
+    >
       <div :style="decoTop" />
       <div :style="decoTopThin" />
 
@@ -71,7 +74,7 @@
       </div>
 
       <!-- Content -->
-      <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height: 600px">
+      <div class="px-6 py-4 overflow-y-auto no-scrollbar" style="max-height: calc(100vh - 180px)">
         <!-- Loading -->
         <div v-if="loading" class="text-center py-8">
           <i class="fa-solid fa-spinner fa-spin text-2xl mb-3" style="color: rgba(90, 79, 64, 0.5)" />
@@ -440,10 +443,12 @@ async function onImportFile(evt: Event) {
 onMounted(loadEntries);
 
 const panelStyle = {
-  maxHeight: '700px',
+  maxHeight: 'calc(100vh - 80px)',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
+  display: 'flex',
+  flexDirection: 'column',
 };
 const headerBorder = { borderBottom: '1px solid rgba(90,79,64,0.3)' };
 const decoTop = {

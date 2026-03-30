@@ -5,62 +5,65 @@
       <!-- Left: map area (viewport + pan arrows) -->
       <div class="bg-map-area">
         <div class="bg-map-container">
+          <!-- 悬浮骰子（地图窗口内右上角） -->
+          <WastelandDice
+            :phase="phase"
+            :dice-value="bgStore.diceValue"
+            :can-roll="bgStore.canRoll"
+            @roll="handleRoll"
+            @finish-roll="bgStore.finishRoll()"
+          />
+
           <!-- Pan arrows -->
-          <div
-            v-show="showPanArrows.top"
-            class="bg-pan-arrow bg-pan-top"
-          >
+          <div v-show="showPanArrows.top" class="bg-pan-arrow bg-pan-top">
             <i class="fa-solid fa-caret-up" />
           </div>
-          <div
-            v-show="showPanArrows.bottom"
-            class="bg-pan-arrow bg-pan-bottom"
-          >
+          <div v-show="showPanArrows.bottom" class="bg-pan-arrow bg-pan-bottom">
             <i class="fa-solid fa-caret-down" />
           </div>
-          <div
-            v-show="showPanArrows.left"
-            class="bg-pan-arrow bg-pan-left"
-          >
+          <div v-show="showPanArrows.left" class="bg-pan-arrow bg-pan-left">
             <i class="fa-solid fa-caret-left" />
           </div>
-          <div
-            v-show="showPanArrows.right"
-            class="bg-pan-arrow bg-pan-right"
-          >
+          <div v-show="showPanArrows.right" class="bg-pan-arrow bg-pan-right">
             <i class="fa-solid fa-caret-right" />
           </div>
-          <div ref="mapViewportRef" class="bg-map-viewport" @mousemove="handleMouseMove" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
           <div
-            class="bg-map-canvas"
-            :style="{ width: bgStore.mapConfig.width + 'px', height: bgStore.mapConfig.height + 'px' }"
+            ref="mapViewportRef"
+            class="bg-map-viewport"
+            @mousemove="handleMouseMove"
+            @mouseenter="handleMouseEnter"
+            @mouseleave="handleMouseLeave"
           >
-            <!-- Nodes (cells) - only walkable path tiles -->
             <div
-              v-for="node in bgStore.mapConfig.nodes"
-              :key="node.id"
-              class="bg-node"
-              :class="[
-                `bg-node-${node.type}`,
-                {
-                  'bg-node-current': node.id === bgStore.currentNodeId,
-                  'bg-node-walkable': bgStore.walkableNodeIds.includes(node.id),
-                  'bg-node-visited': bgStore.visitedNodeIds.has(node.id) && node.id !== bgStore.currentNodeId,
-                },
-              ]"
-              :style="nodeStyle(node)"
-              :title="nodeLabel(node)"
-              @click="handleNodeClick(node.id)"
+              class="bg-map-canvas"
+              :style="{ width: bgStore.mapConfig.width + 'px', height: bgStore.mapConfig.height + 'px' }"
             >
-              <i v-if="nodeIcon(node.type)" :class="nodeIcon(node.type)" class="bg-node-icon" />
-            </div>
+              <!-- Nodes (cells) - only walkable path tiles -->
+              <div
+                v-for="node in bgStore.mapConfig.nodes"
+                :key="node.id"
+                class="bg-node"
+                :class="[
+                  `bg-node-${node.type}`,
+                  {
+                    'bg-node-current': node.id === bgStore.currentNodeId,
+                    'bg-node-walkable': bgStore.walkableNodeIds.includes(node.id),
+                    'bg-node-visited': bgStore.visitedNodeIds.has(node.id) && node.id !== bgStore.currentNodeId,
+                  },
+                ]"
+                :style="nodeStyle(node)"
+                :title="nodeLabel(node)"
+                @click="handleNodeClick(node.id)"
+              >
+                <i v-if="nodeIcon(node.type)" :class="nodeIcon(node.type)" class="bg-node-icon" />
+              </div>
 
-            <!-- Player token -->
-            <div ref="playerTokenRef" class="bg-player-token">
-              <i class="fa-solid fa-person-walking" />
+              <!-- Player token -->
+              <div ref="playerTokenRef" class="bg-player-token">
+                <i class="fa-solid fa-person-walking" />
+              </div>
             </div>
           </div>
-        </div>
         </div>
 
         <!-- Right: sidebar -->
@@ -103,17 +106,6 @@
             </div>
           </div>
 
-          <!-- Dice -->
-          <div class="bg-dice-panel">
-            <div class="bg-dice-face" :class="{ 'bg-dice-rolling': phase === 'rolling' }">
-              {{ diceDisplay }}
-            </div>
-            <button class="bg-roll-btn" :disabled="!bgStore.canRoll" @click="handleRoll">
-              <i class="fa-solid fa-dice" style="margin-right: 5px" />
-              {{ phase === 'rolling' ? '掷骰中…' : '掷骰子' }}
-            </button>
-          </div>
-
           <!-- Seed control -->
           <div class="bg-seed-panel">
             <div class="bg-seed-title">
@@ -128,10 +120,10 @@
                 placeholder="种子数字"
                 @keydown.enter="refreshMap"
               />
-              <button class="bg-seed-btn" @click="refreshMap" title="用当前种子重新生成地图">
+              <button class="bg-seed-btn" title="用当前种子重新生成地图" @click="refreshMap">
                 <i class="fa-solid fa-rotate" />
               </button>
-              <button class="bg-seed-btn" @click="randomSeed" title="随机种子">
+              <button class="bg-seed-btn" title="随机种子" @click="randomSeed">
                 <i class="fa-solid fa-shuffle" />
               </button>
             </div>
@@ -149,7 +141,9 @@
               <button
                 class="bg-ai-toggle"
                 :class="{ 'bg-ai-toggle-on': vnStore.settings.boardGameEventGenEnabled }"
-                @click="vnStore.updateSettings({ boardGameEventGenEnabled: !vnStore.settings.boardGameEventGenEnabled })"
+                @click="
+                  vnStore.updateSettings({ boardGameEventGenEnabled: !vnStore.settings.boardGameEventGenEnabled })
+                "
               >
                 <div class="bg-ai-toggle-slider" />
               </button>
@@ -161,16 +155,16 @@
                   <button
                     class="bg-ai-mode-btn"
                     :class="{ 'bg-ai-mode-btn-active': vnStore.settings.boardGameEventSendMode === 'choice' }"
-                    @click="vnStore.updateSettings({ boardGameEventSendMode: 'choice' })"
                     title="事件选项将出现在VN界面的选择框中"
+                    @click="vnStore.updateSettings({ boardGameEventSendMode: 'choice' })"
                   >
                     选项框
                   </button>
                   <button
                     class="bg-ai-mode-btn"
                     :class="{ 'bg-ai-mode-btn-active': vnStore.settings.boardGameEventSendMode === 'direct' }"
-                    @click="vnStore.updateSettings({ boardGameEventSendMode: 'direct' })"
                     title="选择事件后直接调用主API生成剧情"
+                    @click="vnStore.updateSettings({ boardGameEventSendMode: 'direct' })"
                   >
                     直接
                   </button>
@@ -208,12 +202,15 @@
 
       <!-- ══ Event Overlay ══════════════════════════════════════ -->
       <Transition name="bg-overlay-fade">
-        <div v-if="bgStore.phase === 'event' || bgStore.phase === 'resolving' || bgStore.aiEventGenerating" class="bg-event-overlay">
+        <div
+          v-if="bgStore.phase === 'event' || bgStore.phase === 'resolving' || bgStore.aiEventGenerating"
+          class="bg-event-overlay"
+        >
           <!-- Loading state for AI generation -->
           <div v-if="bgStore.aiEventGenerating && !bgStore.currentEvent" class="bg-event-panel">
             <div class="bg-event-header">
               <div class="bg-event-type-badge bg-badge-loading">
-                <i class="fa-solid fa-spinner fa-spin" style="margin-right:4px;" />
+                <i class="fa-solid fa-spinner fa-spin" style="margin-right: 4px" />
                 生成中
               </div>
               <div class="bg-event-title">正在生成事件...</div>
@@ -221,12 +218,12 @@
             </div>
             <div class="bg-loading-area">
               <div class="bg-loading-spinner">
-                <i class="fa-solid fa-dice-d20 fa-spin" style="font-size:2rem; color:var(--stain);" />
+                <i class="fa-solid fa-dice-d20 fa-spin" style="font-size: 2rem; color: var(--stain)" />
               </div>
               <div class="bg-loading-text">请稍候...</div>
               <div class="bg-loading-actions">
                 <button class="bg-loading-btn bg-loading-btn-cancel" @click="bgStore.cancelAiEventGeneration">
-                  <i class="fa-solid fa-pause" style="margin-right:5px;" />
+                  <i class="fa-solid fa-pause" style="margin-right: 5px" />
                   暂停并返回
                 </button>
               </div>
@@ -237,7 +234,7 @@
           <div v-else-if="bgStore.aiEventError" class="bg-event-panel">
             <div class="bg-event-header">
               <div class="bg-event-type-badge bg-badge-error">
-                <i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;" />
+                <i class="fa-solid fa-triangle-exclamation" style="margin-right: 4px" />
                 生成失败
               </div>
               <div class="bg-event-title">事件生成失败</div>
@@ -246,11 +243,11 @@
             <div class="bg-error-area">
               <div class="bg-error-actions">
                 <button class="bg-error-btn bg-error-btn-retry" @click="handleRetryAiGeneration">
-                  <i class="fa-solid fa-rotate-right" style="margin-right:5px;" />
+                  <i class="fa-solid fa-rotate-right" style="margin-right: 5px" />
                   重试
                 </button>
                 <button class="bg-error-btn bg-error-btn-cancel" @click="bgStore.cancelAiEventGeneration">
-                  <i class="fa-solid fa-xmark" style="margin-right:5px;" />
+                  <i class="fa-solid fa-xmark" style="margin-right: 5px" />
                   取消并返回
                 </button>
               </div>
@@ -264,21 +261,18 @@
                 {{ nodeTypeLabel(bgStore.currentEvent?.nodeType) }}
               </div>
               <div class="bg-event-title">{{ bgStore.currentEvent?.title }}</div>
-              <div class="bg-event-flavor">{{ bgStore.currentEvent?.flavor }}</div>
+              <div class="bg-event-flavor">{{ bgStore.currentEvent?.description }}</div>
             </div>
 
-            <!-- Phase: event → show card selection -->
+            <!-- Phase: event → show event selection -->
             <div v-if="bgStore.phase === 'event'" class="bg-cards-area">
-              <div class="bg-cards-hint">· 选择一张命运之牌 ·</div>
-              <div class="bg-cards-row" :class="`bg-cards-count-${bgStore.currentEvent?.cards.length}`">
+              <div class="bg-cards-hint">· 选择命运 ·</div>
+              <div class="bg-cards-row bg-cards-count-1">
                 <div
-                  v-for="(card, idx) in bgStore.currentEvent?.cards"
-                  :key="card.id"
                   class="bg-tarot-wrapper"
-                  :style="tarotRotation(idx, bgStore.currentEvent?.cards.length ?? 1)"
-                  @click="handleCardClick(card.id)"
+                  @click="handleEventClick"
                 >
-                  <div class="bg-tarot-inner" :class="{ 'bg-tarot-flipped': flippedCards.has(card.id) }">
+                  <div class="bg-tarot-inner" :class="{ 'bg-tarot-flipped': eventFlipped }">
                     <!-- Back face -->
                     <div class="bg-tarot-face bg-tarot-back">
                       <div class="bg-tarot-back-deco">
@@ -296,11 +290,14 @@
                     <!-- Front face -->
                     <div class="bg-tarot-face bg-tarot-front">
                       <div class="bg-tarot-front-content">
-                        <div class="bg-tarot-front-title">{{ card.title }}</div>
+                        <div class="bg-tarot-front-title">{{ bgStore.currentEvent?.title }}</div>
                         <div class="bg-tarot-front-divider" />
-                        <div class="bg-tarot-front-desc">{{ card.description }}</div>
+                        <div class="bg-tarot-front-desc">{{ bgStore.currentEvent?.description }}</div>
+                        <div class="bg-tarot-front-tendency" :class="`bg-tendency-${bgStore.currentEvent?.tendency}`">
+                          {{ tendencyLabel(bgStore.currentEvent?.tendency) }}
+                        </div>
                         <div class="bg-tarot-front-confirm">
-                          <span>点击确认发送</span>
+                          <span>点击确认</span>
                           <i class="fa-solid fa-hand-pointer" style="font-size: 0.6rem" />
                         </div>
                       </div>
@@ -312,32 +309,25 @@
 
             <!-- Phase: resolving → show result -->
             <div v-else-if="bgStore.phase === 'resolving'" class="bg-resolve-area">
-              <div class="bg-resolve-card-title">{{ bgStore.selectedCard?.title }}</div>
+              <div class="bg-resolve-card-title">{{ bgStore.selectedEvent?.title }}</div>
               <div class="bg-resolve-message">{{ bgStore.resolveMessage }}</div>
               <div class="bg-resolve-effects">
                 <span
-                  v-if="bgStore.selectedCard?.effect.hp"
+                  v-if="bgStore.selectedEvent?.effect.hp"
                   class="bg-effect-chip"
-                  :class="(bgStore.selectedCard.effect.hp ?? 0) > 0 ? 'bg-effect-pos' : 'bg-effect-neg'"
+                  :class="(bgStore.selectedEvent.effect.hp ?? 0) > 0 ? 'bg-effect-pos' : 'bg-effect-neg'"
                 >
-                  ❤ {{ (bgStore.selectedCard.effect.hp ?? 0) > 0 ? '+' : '' }}{{ bgStore.selectedCard.effect.hp }}
+                  ❤ {{ (bgStore.selectedEvent.effect.hp ?? 0) > 0 ? '+' : '' }}{{ bgStore.selectedEvent.effect.hp }}
                 </span>
                 <span
-                  v-if="bgStore.selectedCard?.effect.sanity"
+                  v-if="bgStore.selectedEvent?.effect.sanity"
                   class="bg-effect-chip"
-                  :class="(bgStore.selectedCard.effect.sanity ?? 0) > 0 ? 'bg-effect-pos' : 'bg-effect-neg'"
+                  :class="(bgStore.selectedEvent.effect.sanity ?? 0) > 0 ? 'bg-effect-pos' : 'bg-effect-neg'"
                 >
-                  🧠 {{ (bgStore.selectedCard.effect.sanity ?? 0) > 0 ? '+' : ''
-                  }}{{ bgStore.selectedCard.effect.sanity }}
+                  🧠 {{ (bgStore.selectedEvent.effect.sanity ?? 0) > 0 ? '+' : ''
+                  }}{{ bgStore.selectedEvent.effect.sanity }}
                 </span>
-                <span
-                  v-if="bgStore.selectedCard?.effect.luck"
-                  class="bg-effect-chip"
-                  :class="(bgStore.selectedCard.effect.luck ?? 0) > 0 ? 'bg-effect-pos' : 'bg-effect-neg'"
-                >
-                  🍀 {{ (bgStore.selectedCard.effect.luck ?? 0) > 0 ? '+' : '' }}{{ bgStore.selectedCard.effect.luck }}
-                </span>
-                <span v-if="bgStore.selectedCard?.effect.transfer" class="bg-effect-chip bg-effect-transfer">
+                <span v-if="bgStore.selectedEvent?.effect.transfer" class="bg-effect-chip bg-effect-transfer">
                   ⊙ 传送
                 </span>
               </div>
@@ -356,8 +346,9 @@
 <script setup lang="ts">
 import { gsap } from 'gsap';
 import { useBoardGameStore } from './boardgame/boardGameStore';
+import type { GameEvent, MapNode } from './boardgame/types';
 import { useVNStore } from './store';
-import type { MapNode, GameEvent, EventCard } from './boardgame/types';
+import WastelandDice from './WastelandDice.vue';
 
 const bgStore = useBoardGameStore();
 const vnStore = useVNStore();
@@ -372,11 +363,10 @@ const playerTokenRef = ref<HTMLElement>();
 const mapViewportRef = ref<HTMLElement>();
 const logScrollRef = ref<HTMLElement>();
 const seedInput = ref(bgStore.seed);
-const diceDisplay = ref<string | number>('?');
 const phase = computed(() => bgStore.phase);
 
 // ── Tarot card flip state ──────────────────────────────────────
-const flippedCards = ref(new Set<string>());
+const eventFlipped = ref(false);
 
 // ── Pan arrows & auto-scroll ───────────────────────────────────
 const showPanArrows = ref({ top: false, bottom: false, left: false, right: false });
@@ -385,16 +375,22 @@ const EDGE_THRESHOLD = 120; // pixels from edge to trigger pan (increased)
 const PAN_SPEED = 8; // pixels per frame
 const isMouseInViewport = ref(false);
 
+/** 与 WastelandDice 右上角屏蔽区一致：此矩形内不触发边缘滚动（避免靠近骰子时误触） */
+const DICE_PAN_DEAD_ZONE = { width: 240, height: 200 } as const;
+
 function handleMouseMove(e: MouseEvent) {
   if (!mapViewportRef.value) return;
   const rect = mapViewportRef.value.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  const nearTop = y < EDGE_THRESHOLD;
-  const nearBottom = y > rect.height - EDGE_THRESHOLD;
-  const nearLeft = x < EDGE_THRESHOLD;
-  const nearRight = x > rect.width - EDGE_THRESHOLD;
+  const { width: dzW, height: dzH } = DICE_PAN_DEAD_ZONE;
+  const inDiceDeadZone = x >= rect.width - dzW && y >= 0 && y < dzH;
+
+  const nearTop = !inDiceDeadZone && y < EDGE_THRESHOLD;
+  const nearBottom = !inDiceDeadZone && y > rect.height - EDGE_THRESHOLD;
+  const nearLeft = !inDiceDeadZone && x < EDGE_THRESHOLD;
+  const nearRight = !inDiceDeadZone && x > rect.width - EDGE_THRESHOLD;
 
   showPanArrows.value.top = nearTop;
   showPanArrows.value.bottom = nearBottom;
@@ -458,39 +454,6 @@ onUnmounted(() => {
   stopPan();
 });
 
-// ── Computed edges ─────────────────────────────────────────────
-interface Edge {
-  id: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
-const edges = computed<Edge[]>(() => {
-  const seen = new Set<string>();
-  const result: Edge[] = [];
-  for (const node of bgStore.mapConfig.nodes) {
-    for (const nbId of node.neighbors) {
-      const key = [node.id, nbId].sort().join('|');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const nb = bgStore.nodeMap.get(nbId);
-      if (!nb) continue;
-      result.push({ id: key, x1: node.x, y1: node.y, x2: nb.x, y2: nb.y });
-    }
-  }
-  return result;
-});
-
-const walkableEdges = computed<Edge[]>(() => {
-  const cur = bgStore.currentNodeId;
-  const walkable = new Set(bgStore.walkableNodeIds);
-  return edges.value.filter(e => {
-    return e.id.includes(cur) && (walkable.has(e.id.split('|')[0]!) || walkable.has(e.id.split('|')[1]!));
-  });
-});
-
 // ── Helper functions ───────────────────────────────────────────
 function nodeStyle(node: MapNode) {
   // Nodes are now square cells, not circles
@@ -506,10 +469,9 @@ function nodeStyle(node: MapNode) {
 function nodeIcon(type: MapNode['type']): string {
   const icons: Record<string, string> = {
     start: 'fa-solid fa-flag-checkered',
-    encounter: 'fa-solid fa-skull',
+    encounter: 'fa-solid fa-users',
     trap: 'fa-solid fa-triangle-exclamation',
     fortune: 'fa-solid fa-star',
-    transfer: 'fa-solid fa-circle-dot',
     end: 'fa-solid fa-flag',
     empty: '',
   };
@@ -523,7 +485,6 @@ function nodeLabel(node: MapNode): string {
     encounter: '遭遇',
     trap: '陷阱',
     fortune: '意外之喜',
-    transfer: '传送',
     end: '终点',
   };
   return labels[node.type] ?? node.type;
@@ -534,9 +495,17 @@ function nodeTypeLabel(type?: string): string {
     encounter: '⚔ 遭遇',
     trap: '⚠ 陷阱',
     fortune: '✦ 意外之喜',
-    transfer: '⊙ 传送',
   };
   return m[type ?? ''] ?? '';
+}
+
+function tendencyLabel(tendency?: string): string {
+  const m: Record<string, string> = {
+    negative: '◆ 危险',
+    positive: '◇ 有利',
+    neutral: '◇ 中性',
+  };
+  return m[tendency ?? ''] ?? '';
 }
 
 const phaseLabel = computed(() => {
@@ -549,12 +518,6 @@ const phaseLabel = computed(() => {
   };
   return labels[bgStore.phase] ?? '';
 });
-
-function tarotRotation(idx: number, total: number) {
-  const mid = (total - 1) / 2;
-  const deg = (idx - mid) * 5;
-  return { transform: `rotate(${deg}deg)` };
-}
 
 // ── Player token animation ─────────────────────────────────────
 function setTokenPosition(nodeId: string, animate = false, fromNodeId?: string) {
@@ -625,7 +588,25 @@ watch(
 );
 
 onMounted(() => {
-  nextTick(() => setTokenPosition(bgStore.currentNodeId));
+  nextTick(() => {
+    setTokenPosition(bgStore.currentNodeId);
+
+    // 初始化时触发预生成事件
+    if (vnStore.settings.boardGameEventGenEnabled) {
+      const nodeTypeMap = new Map<string, string>();
+      for (const node of bgStore.mapConfig.nodes) {
+        if (node.type !== 'empty' && node.type !== 'start' && node.type !== 'end') {
+          nodeTypeMap.set(node.id, node.type);
+        }
+      }
+
+      const eventNodeIds = Array.from(nodeTypeMap.keys());
+      if (eventNodeIds.length > 0) {
+        console.info('[废土行路] 初始化预生成事件:', eventNodeIds.length, '个节点');
+        bgStore.triggerPreGenerateEvents(eventNodeIds, nodeTypeMap, vnStore, `init_${seedInput.value}`);
+      }
+    }
+  });
 });
 
 // ── Auto-scroll log ────────────────────────────────────────────
@@ -638,24 +619,11 @@ watch(
 );
 
 // ── Dice ───────────────────────────────────────────────────────
-let diceInterval: ReturnType<typeof setInterval> | null = null;
-
 function handleRoll() {
   if (!bgStore.canRoll) return;
   bgStore.rollDice();
-  diceDisplay.value = '?';
-
-  let count = 0;
-  diceInterval = setInterval(() => {
-    diceDisplay.value = Math.floor(Math.random() * 6) + 1;
-    count++;
-    if (count >= 14) {
-      clearInterval(diceInterval!);
-      diceInterval = null;
-      diceDisplay.value = bgStore.diceValue;
-      bgStore.finishRoll();
-    }
-  }, 75);
+  // 动画由 WastelandDice 组件内部 watch phase → rolling 自动驱动
+  // finishRoll 也由组件的 emit('finishRoll') 触发
 }
 
 // ── Node click ─────────────────────────────────────────────────
@@ -705,49 +673,49 @@ watch(
 );
 
 // ── Card interaction ───────────────────────────────────────────
-function handleCardClick(cardId: string) {
+function handleEventClick() {
   if (bgStore.phase !== 'event') return;
-  if (!flippedCards.value.has(cardId)) {
+  if (!eventFlipped.value) {
     // First click: flip to reveal
-    flippedCards.value.add(cardId);
+    eventFlipped.value = true;
   } else {
-    // Second click: select this card
-    const card = bgStore.currentEvent?.cards.find(c => c.id === cardId);
-    if (card) {
+    // Second click: select this event
+    const event = bgStore.currentEvent;
+    if (event) {
       // Check send mode
       if (vnStore.settings.boardGameEventSendMode === 'direct') {
         // Direct send: call main API to generate story
-        handleDirectSend(card);
+        handleDirectSend(event);
       } else {
         // Send to choice: go back to VN and add as temp option
-        handleSendToChoice(card);
+        handleSendToChoice(event);
       }
     }
   }
 }
 
-async function handleDirectSend(card: EventCard) {
-  bgStore.selectCard(card);
-  
+async function handleDirectSend(event: GameEvent) {
+  bgStore.selectEvent(event);
+
   try {
     // 构建用户输入，包含事件描述
-    const userInput = `${card.title}：${card.description}`;
-    
+    const userInput = `${event.title}：${event.description}`;
+
     // 调用主API生成剧情
     vnStore.showToast('正在生成剧情...');
-    const result = await generate({ 
+    await generate({
       user_input: userInput,
-      should_silence: false 
+      should_silence: false,
     });
-    
+
     // 关闭废土行路界面
     vnStore.activeModuleId = null;
     vnStore.setOverlay('none');
-    
+
     // 清理状态
-    flippedCards.value.clear();
+    eventFlipped.value = false;
     bgStore.finishResolve();
-    
+
     vnStore.showToast('剧情生成完成');
   } catch (error: any) {
     console.error('[废土行路] 直接发送失败:', error);
@@ -755,21 +723,41 @@ async function handleDirectSend(card: EventCard) {
   }
 }
 
-function handleSendToChoice(card: EventCard) {
-  // Add card as temp option
-  vnStore.setTempOptions([{
-    choiceId: card.id,
-    text: card.title + '：' + card.description,
-  }]);
-  
+function handleSendToChoice(event: GameEvent) {
+  // 构建事件消息，格式：<user>触发了事件「title」，description，结果：effect，HP ±X、理智 ±Y
+  if (!event) return;
+
+  // 构建效果变化描述
+  const effectParts: string[] = [];
+  if (event.effect.hp !== undefined) {
+    effectParts.push(`HP ${event.effect.hp > 0 ? '+' : ''}${event.effect.hp}`);
+  }
+  if (event.effect.sanity !== undefined) {
+    effectParts.push(`理智 ${event.effect.sanity > 0 ? '+' : ''}${event.effect.sanity}`);
+  }
+  const effectChange = effectParts.length > 0 ? `，${effectParts.join('、')}` : '';
+
+  // 完整的消息文本，填入自由输入框
+  const eventMessage = `<user>触发了事件「${event.title}」，${event.description}，结果：${event.effect.message}${effectChange}`;
+  vnStore.customInputText = eventMessage;
+
+  // 添加到选项框中，作为自由输入选项（用户可以编辑后再发送）
+  vnStore.setTempOptions([
+    {
+      choiceId: event.id,
+      text: event.title + '：' + event.description,
+      isCustomInput: true,
+    },
+  ]);
+
   // Close board game and return to VN
   vnStore.activeModuleId = null;
   vnStore.setOverlay('none');
-  
+
   // Clear board game state
-  flippedCards.value.clear();
+  eventFlipped.value = false;
   bgStore.finishResolve();
-  
+
   vnStore.showToast('事件选项已添加到选择框');
 }
 
@@ -783,98 +771,29 @@ function handleRetryAiGeneration() {
 }
 
 async function triggerAiEventGeneration(nodeType: string) {
-  // Generate a unique ID for this generation request
-  const generationId = `boardgame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  bgStore.startAiEventGeneration(generationId);
-  
-  try {
-    // Get current scene from VN store
-    const currentScene = vnStore.currentScene || '未知场景';
-    
-    // Determine event tendency based on node type
-    let tendency = '';
-    if (nodeType === 'trap') {
-      tendency = '负面/危险';
-    } else if (nodeType === 'fortune') {
-      tendency = '正面/有利';
-    } else if (nodeType === 'encounter') {
-      tendency = '中性/随机';
-    }
-    
-    // Build system prompt for event generation
-    const systemPrompt = `你是一个废土世界的事件生成器。根据当前场景生成一个${tendency}倾向的事件。
-
-当前场景：${currentScene}
-
-请生成一个事件，包含：
-1. 事件标题（简短）
-2. 事件描述（氛围描写）
-3. 3个选项，每个选项包含：
-   - 选项标题
-   - 选项描述
-   - 效果描述
-
-请以JSON格式返回，格式如下：
-{
-  "title": "事件标题",
-  "flavor": "事件氛围描写",
-  "cards": [
-    {
-      "title": "选项1标题",
-      "description": "选项1描述",
-      "effect": "效果描述"
-    },
-    {
-      "title": "选项2标题",
-      "description": "选项2描述",
-      "effect": "效果描述"
-    },
-    {
-      "title": "选项3标题",
-      "description": "选项3描述",
-      "effect": "效果描述"
-    }
-  ]
-}`;
-
-    // Call second API using store's callSecondApi method
-    const result = await vnStore.callSecondApi(
-      'boardGameEvent',
-      {
-        contentText: systemPrompt
-      },
-      generationId
-    );
-    
-    // Parse the result
-    const jsonMatch = result.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('AI返回格式错误，未找到JSON数据');
-    }
-    
-    const eventData = JSON.parse(jsonMatch[0]);
-    
-    // Convert to GameEvent format
-    const gameEvent: GameEvent = {
-      id: `ai_${Date.now()}`,
-      nodeType: nodeType as any,
-      title: eventData.title,
-      flavor: eventData.flavor,
-      cards: eventData.cards.map((card: any, idx: number) => ({
-        id: `ai_card_${Date.now()}_${idx}`,
-        title: card.title,
-        description: card.description,
-        effect: {
-          message: card.effect
-        }
-      }))
-    };
-    
-    bgStore.setAiGeneratedEvent(gameEvent);
+  // 检查是否有预生成的事件
+  const preGenerated = bgStore.getPreGeneratedEvent(bgStore.currentNodeId);
+  if (preGenerated) {
+    bgStore.setAiGeneratedEvent(preGenerated);
     bgStore.finishAiEventGeneration(true);
-    bgStore.addLog(`⚡ AI生成事件：${gameEvent.title}`);
-    
+    bgStore.consumePreGeneratedEvent(bgStore.currentNodeId);
+    bgStore.addLog(`⚡ AI生成事件：${preGenerated.title}`);
+    return;
+  }
+
+  // 如果没有预生成事件，则实时生成（降级方案）
+  bgStore.startAiEventGeneration(`realtime_${Date.now()}`);
+
+  try {
+    const eventData = await vnStore.generateBoardGameEvent(nodeType, `realtime_${Date.now()}`);
+
+    if (!eventData) {
+      throw new Error('事件生成失败');
+    }
+
+    bgStore.setAiGeneratedEvent(eventData);
+    bgStore.finishAiEventGeneration(true);
+    bgStore.addLog(`⚡ AI生成事件：${eventData.title}`);
   } catch (error: any) {
     console.error('[废土行路] AI事件生成失败:', error);
     bgStore.finishAiEventGeneration(false, error.message || '生成失败');
@@ -882,14 +801,36 @@ async function triggerAiEventGeneration(nodeType: string) {
 }
 
 function handleContinue() {
-  flippedCards.value.clear();
+  eventFlipped.value = false;
   bgStore.finishResolve();
 }
 
 // ── Seed / map ─────────────────────────────────────────────────
 function refreshMap() {
+  // 触发地图重新生成
   bgStore.regenerateMap(seedInput.value);
-  nextTick(() => setTokenPosition(bgStore.currentNodeId));
+
+  // 在地图重新生成后，触发预生成事件
+  nextTick(() => {
+    // 构建 nodeId 到 nodeType 的映射
+    const nodeTypeMap = new Map<string, string>();
+    for (const node of bgStore.mapConfig.nodes) {
+      if (node.type !== 'empty' && node.type !== 'start' && node.type !== 'end') {
+        nodeTypeMap.set(node.id, node.type);
+      }
+    }
+
+    // 获取所有需要预生成事件的节点 ID
+    const eventNodeIds = Array.from(nodeTypeMap.keys());
+
+    if (eventNodeIds.length > 0 && vnStore.settings.boardGameEventGenEnabled) {
+      console.info('[废土行路] 开始预生成事件:', eventNodeIds.length, '个节点');
+      bgStore.triggerPreGenerateEvents(eventNodeIds, nodeTypeMap, vnStore, `map_${seedInput.value}`);
+    }
+
+    // 重置角色位置
+    setTokenPosition(bgStore.currentNodeId);
+  });
 }
 
 function randomSeed() {
@@ -929,7 +870,7 @@ watch(
 .bg-root {
   display: flex;
   flex-direction: column;
-  height: 600px;
+  height: 100%;
   background: var(--vn-bg);
   position: relative;
   overflow: hidden;
@@ -942,6 +883,7 @@ watch(
   overflow: hidden;
 }
 
+/* 横屏：左侧地图 + 右侧侧边栏 */
 .bg-map-area {
   display: flex;
   flex: 1;
@@ -949,10 +891,28 @@ watch(
   overflow: hidden;
 }
 
+/* 竖屏：上方地图（55%） + 下方侧边栏 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-map-area {
+    flex-direction: column;
+  }
+}
+
 .bg-map-container {
   flex: 1;
   position: relative;
   overflow: hidden;
+  min-height: 0;
+}
+
+/* 竖屏：地图占上方约 55%（保留足够空间给侧边栏） */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-map-container {
+    height: 55%;
+    min-height: 140px;
+    flex: none;
+    border-bottom: 1px solid rgba(90, 79, 64, 0.25);
+  }
 }
 
 /* ── Map viewport ────────────────────────────────────────────── */
@@ -962,6 +922,7 @@ watch(
   overflow: auto;
   background: linear-gradient(135deg, rgba(35, 30, 26, 0.2) 0%, rgba(42, 36, 32, 0.3) 100%);
   position: relative;
+  z-index: 1; /* 低于骰子屏蔽层 (25)，保证右上角拦截鼠标 */
 }
 
 /* ── Pan arrows ──────────────────────────────────────────────── */
@@ -1305,6 +1266,166 @@ watch(
   overflow-y: auto;
 }
 
+/* 竖屏：侧边栏改为横向滚动栏，占下方 45%，内容从左到右排列 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-sidebar {
+    width: 100%;
+    height: 45%;
+    flex: none;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-left: none;
+    border-top: 1px solid rgba(90, 79, 64, 0.3);
+  }
+}
+
+/* 竖屏下：各子面板改为竖向一列，占满高度 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-stats-panel,
+  .bg-seed-panel,
+  .bg-ai-settings-panel {
+    flex-shrink: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-bottom: none;
+    border-right: 1px solid rgba(90, 79, 64, 0.2);
+    min-width: 120px;
+  }
+  .bg-seed-panel,
+  .bg-ai-settings-panel {
+    border-right: none;
+  }
+}
+
+/* 竖屏下：状态面板内部压缩 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-stats-panel {
+    gap: 3px;
+  }
+  .bg-stat-row {
+    width: 100%;
+  }
+  .bg-stat-label {
+    width: 36px;
+    font-size: 8px;
+  }
+  .bg-stat-val {
+    width: 34px;
+    font-size: 8px;
+  }
+  .bg-stat-luck {
+    font-size: 8px;
+    gap: 3px;
+  }
+  .bg-stat-track {
+    height: 4px;
+  }
+  .bg-steps-total {
+    font-size: 8px;
+  }
+}
+
+/* 竖屏下：种子面板压缩 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-seed-title {
+    font-size: 7px;
+    margin-bottom: 4px;
+  }
+  .bg-seed-row {
+    width: 100%;
+  }
+  .bg-seed-input {
+    height: 24px;
+    font-size: 10px;
+  }
+  .bg-seed-btn {
+    width: 24px;
+    height: 24px;
+  }
+  .bg-seed-info {
+    font-size: 7px;
+  }
+}
+
+/* 竖屏下：AI设置面板压缩 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-ai-settings-title {
+    font-size: 7px;
+    margin-bottom: 5px;
+  }
+  .bg-ai-settings-row {
+    margin-bottom: 4px;
+  }
+  .bg-ai-settings-label {
+    font-size: 8px;
+  }
+  .bg-ai-toggle {
+    width: 30px;
+    height: 16px;
+  }
+  .bg-ai-toggle-slider {
+    width: 10px;
+    height: 10px;
+    top: 2px;
+    left: 2px;
+  }
+  .bg-ai-toggle-on .bg-ai-toggle-slider {
+    left: 16px;
+  }
+  .bg-ai-mode-btns {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bg-ai-mode-btn {
+    font-size: 8px;
+    padding: 2px 6px;
+  }
+  .bg-ai-settings-hint {
+    font-size: 7px;
+  }
+}
+
+/* 竖屏下：日志面板占满剩余空间并横向滚动 */
+@media (orientation: portrait), (max-aspect-ratio: 4/3) {
+  .bg-log-panel {
+    flex-shrink: 1;
+    flex-direction: row;
+    overflow: hidden;
+    min-width: 140px;
+  }
+  .bg-log-title {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    padding: 10px 6px;
+    font-size: 8px;
+    border-bottom: none;
+    border-right: 1px solid rgba(90, 79, 64, 0.15);
+    flex-shrink: 0;
+  }
+  .bg-log-body {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 8px;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .bg-log-entry {
+    font-size: 8px;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    white-space: nowrap;
+    max-height: none;
+    line-height: 1.4;
+  }
+}
+
 /* Phase badge */
 .bg-phase-badge {
   display: flex;
@@ -1425,74 +1546,6 @@ watch(
   font-family: monospace;
   font-size: 9px;
   color: rgba(139, 125, 107, 0.5);
-}
-
-/* Dice */
-.bg-dice-panel {
-  padding: 12px;
-  border-bottom: 1px solid rgba(90, 79, 64, 0.2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.bg-dice-face {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
-  font-weight: bold;
-  font-family: monospace;
-  color: var(--stain);
-  border: 2px solid rgba(196, 162, 101, 0.3);
-  background: rgba(42, 36, 32, 0.8);
-  border-radius: 8px;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
-  transition: transform 0.08s;
-}
-
-.bg-dice-rolling {
-  animation: bg-dice-shake 0.12s linear infinite;
-  border-color: var(--stain);
-  color: var(--rust);
-}
-
-@keyframes bg-dice-shake {
-  0%,
-  100% {
-    transform: rotate(-3deg) scale(1.02);
-  }
-  50% {
-    transform: rotate(3deg) scale(1.02);
-  }
-}
-
-.bg-roll-btn {
-  width: 100%;
-  padding: 6px 0;
-  font-size: 11px;
-  font-family: 'Noto Serif SC', serif;
-  border: 1px solid rgba(139, 69, 19, 0.5);
-  background: rgba(139, 69, 19, 0.15);
-  color: var(--stain);
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.2s;
-  letter-spacing: 0.06em;
-}
-
-.bg-roll-btn:hover:not(:disabled) {
-  background: rgba(139, 69, 19, 0.28);
-  border-color: var(--rust);
-  color: rgba(212, 197, 160, 0.9);
-}
-
-.bg-roll-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }
 
 /* Seed */
@@ -1827,7 +1880,8 @@ watch(
 }
 
 @keyframes bg-loading-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.6;
     transform: scale(1);
   }
@@ -2063,6 +2117,26 @@ watch(
   font-family: monospace;
   color: rgba(196, 162, 101, 0.5);
   letter-spacing: 0.05em;
+}
+
+.bg-tarot-front-tendency {
+  font-size: 8px;
+  font-family: monospace;
+  text-align: center;
+  letter-spacing: 0.05em;
+  padding: 2px 0;
+}
+
+.bg-tendency-negative {
+  color: rgba(220, 80, 80, 0.8);
+}
+
+.bg-tendency-positive {
+  color: rgba(100, 200, 120, 0.8);
+}
+
+.bg-tendency-neutral {
+  color: rgba(180, 160, 120, 0.8);
 }
 
 .bg-tarot-wrapper:hover .bg-tarot-inner:not(.bg-tarot-flipped) {

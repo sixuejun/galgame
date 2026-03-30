@@ -1,17 +1,49 @@
 <template>
-  <div v-if="currentBlock" class="relative w-full" @click="handleClickText">
+  <!-- 全屏黑屏文字转场效果 -->
+  <Transition
+    enter-active-class="transition-opacity duration-700"
+    enter-from-class="opacity-0"
+    enter-to-class="opacity-100"
+    leave-active-class="transition-opacity duration-500"
+    leave-from-class="opacity-100"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="currentBlock?.type === 'blacktext'"
+      class="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black"
+    >
+      <div class="text-center max-w-2xl">
+        <p
+          ref="blacktextRef"
+          class="text-xl md:text-2xl leading-relaxed tracking-wide transition-opacity duration-500"
+          :class="isBlacktextVisible ? 'opacity-100' : 'opacity-0'"
+          style="color: rgba(212,197,160,0.9); font-family: inherit;"
+        >
+          {{ displayedText }}
+          <span
+            v-if="isTyping"
+            class="inline-block ml-0.5"
+            style="width:2px; height:1.2rem; background:rgba(212,197,160,0.8); animation: cursor-blink 1s infinite;"
+          />
+        </p>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- 普通对话框（非黑屏文字） -->
+  <div v-if="currentBlock && currentBlock.type !== 'blacktext'" class="relative w-full" @click="handleClickText">
     <div class="relative mx-3 md:mx-8 lg:mx-16">
       <div
         class="relative border backdrop-blur-sm"
         :style="{
           borderColor: 'rgba(90,79,64,0.6)',
-          background: currentBlock.type === 'blacktext' ? 'rgba(0,0,0,0.95)' : 'var(--vn-dialogue-bg)',
+          background: 'var(--vn-dialogue-bg)',
           boxShadow: 'inset 0 0 30px rgba(42,36,32,0.3), 0 4px 12px rgba(0,0,0,0.4)',
         }"
       >
-        <!-- Top decorative lines (hidden for blacktext) -->
-        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'3px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.4), transparent)' }" />
-        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'1px', marginTop:'2px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
+        <!-- Top decorative lines -->
+        <div :style="{ height:'3px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.4), transparent)' }" />
+        <div :style="{ height:'1px', marginTop:'2px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
 
         <div class="flex items-stretch">
           <!-- Prev arrow -->
@@ -47,8 +79,7 @@
                 :style="{
                   color: getTextColor(),
                   fontStyle: currentBlock.type === 'narration' ? 'italic' : 'normal',
-                  textAlign: currentBlock.type === 'blacktext' ? 'center' : currentBlock.type === 'user' ? 'right' : 'left',
-                  fontSize: currentBlock.type === 'blacktext' ? '1.5rem' : undefined,
+                  textAlign: currentBlock.type === 'user' ? 'right' : 'left',
                 }"
               >
                 {{ displayedText }}
@@ -72,9 +103,9 @@
           </button>
         </div>
 
-        <!-- Bottom decorative lines (hidden for blacktext) -->
-        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
-        <div v-if="currentBlock.type !== 'blacktext'" :style="{ height:'2px', marginTop:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.3), transparent)' }" />
+        <!-- Bottom decorative lines -->
+        <div :style="{ height:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.2), transparent)' }" />
+        <div :style="{ height:'2px', marginTop:'1px', background:'linear-gradient(to right, transparent, rgba(212,197,160,0.3), transparent)' }" />
 
         <!-- Block counter -->
         <div class="absolute bottom-1 right-3" style="font-size:10px; color:var(--vn-muted); font-family:monospace; opacity:0.4;">
@@ -95,10 +126,12 @@ const props = defineProps<{
 
 const store = useVNStore();
 const textRef = ref<HTMLDivElement | null>(null);
+const blacktextRef = ref<HTMLParagraphElement | null>(null);
 const isManualScroll = ref(false);
 
 const displayedText = ref('');
 const isTyping = ref(false);
+const isBlacktextVisible = ref(false);
 let typingTimer: ReturnType<typeof setTimeout> | null = null;
 
 const currentBlock = computed(() => store.currentBlock);
@@ -116,7 +149,7 @@ function nextBlock() {
 
 function getTextColor() {
   if (!currentBlock.value) return 'rgba(212,197,160,0.9)';
-  
+
   switch (currentBlock.value.type) {
     case 'blacktext':
       return 'rgba(212,197,160,0.9)';
@@ -132,7 +165,7 @@ function getTextColor() {
 
 function getBlockText() {
   if (!currentBlock.value) return '';
-  
+
   switch (currentBlock.value.type) {
     case 'character':
       return currentBlock.value.text || '';
@@ -154,6 +187,7 @@ watch(
 
     displayedText.value = '';
     isTyping.value = true;
+    isBlacktextVisible.value = false;
 
     const fullText = getBlockText();
     const charDelay = store.settings.textSpeed >= 10 ? 0 : Math.max(10, 120 - store.settings.textSpeed * 12);
@@ -162,6 +196,12 @@ watch(
     if (charDelay === 0) {
       displayedText.value = fullText;
       isTyping.value = false;
+      // 黑屏文字：等待过渡动画完成后淡入文字
+      if (block.type === 'blacktext') {
+        setTimeout(() => {
+          isBlacktextVisible.value = true;
+        }, 100);
+      }
       return;
     }
 
@@ -174,7 +214,16 @@ watch(
         isTyping.value = false;
       }
     };
-    typingTimer = setTimeout(typeNext, charDelay);
+
+    // 黑屏文字：等待过渡动画完成后开始打字
+    if (block.type === 'blacktext') {
+      setTimeout(() => {
+        isBlacktextVisible.value = true;
+        typingTimer = setTimeout(typeNext, charDelay);
+      }, 100);
+    } else {
+      typingTimer = setTimeout(typeNext, charDelay);
+    }
   },
   { immediate: true },
 );
@@ -201,6 +250,18 @@ function handleTextScroll() {
 }
 
 function handleClickText() {
+  // 黑屏文字块：点击直接进入下一个
+  if (currentBlock.value?.type === 'blacktext') {
+    if (isTyping.value) {
+      if (typingTimer) clearTimeout(typingTimer);
+      displayedText.value = getBlockText();
+      isTyping.value = false;
+    } else if (!isLastBlock.value) {
+      nextBlock();
+    }
+    return;
+  }
+
   if (isTyping.value) {
     if (typingTimer) clearTimeout(typingTimer);
     displayedText.value = getBlockText();

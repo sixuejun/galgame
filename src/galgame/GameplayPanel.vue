@@ -74,7 +74,7 @@
       </div>
 
       <!-- Module Grid -->
-      <div ref="moduleGridRef" class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: 500px">
+      <div ref="moduleGridRef" class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: calc(100vh - 350px)">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <button
             v-for="mod in displayModules"
@@ -168,9 +168,9 @@
 
       <!-- System Chat -->
       <div ref="systemChatRef" class="sys-chat-wrapper" style="display: none">
-        <div class="flex" style="height: 320px">
-          <!-- Contacts Sidebar -->
-          <div ref="contactsRef" class="sys-contacts-sidebar">
+        <div class="sys-chat-container">
+          <!-- Contacts Header (Horizontal on mobile, Vertical on desktop) -->
+          <div ref="contactsRef" class="sys-contacts-header">
             <div class="sys-contacts-title">
               <i class="fa-solid fa-tower-broadcast" style="font-size: 0.6rem" />
               <span>频道</span>
@@ -351,10 +351,12 @@ import { calcCommission, useVNStore } from './store';
 const store = useVNStore();
 
 const panelStyle = {
-  maxHeight: '700px',
+  maxHeight: 'min(700px, calc(100vh - 80px))',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
+  display: 'flex',
+  flexDirection: 'column',
 };
 const headerBorder = { borderBottom: '1px solid rgba(90,79,64,0.3)' };
 const decoTop = {
@@ -557,9 +559,9 @@ async function openSystemChat() {
 
   if (contactsRef.value) {
     tl.from(contactsRef.value, {
-      x: -130,
+      y: -60,
       opacity: 0,
-      duration: 0.45,
+      duration: 0.4,
       ease: 'power3.out',
     });
   }
@@ -569,11 +571,11 @@ async function openSystemChat() {
       chatAreaRef.value,
       {
         opacity: 0,
-        x: 20,
+        y: 15,
         duration: 0.35,
         ease: 'power2.out',
       },
-      '-=0.3',
+      '-=0.25',
     );
   }
 
@@ -581,9 +583,9 @@ async function openSystemChat() {
     tl.from(
       inputBarRef.value,
       {
-        y: 40,
+        y: 30,
         opacity: 0,
-        duration: 0.38,
+        duration: 0.35,
         ease: 'back.out(1.5)',
       },
       '-=0.2',
@@ -599,7 +601,7 @@ async function closeSystemChat() {
 
   if (inputBarRef.value) {
     tl.to(inputBarRef.value, {
-      y: 30,
+      y: 25,
       opacity: 0,
       duration: 0.2,
       ease: 'power2.in',
@@ -611,7 +613,7 @@ async function closeSystemChat() {
       chatAreaRef.value,
       {
         opacity: 0,
-        x: 15,
+        y: 10,
         duration: 0.2,
       },
       '-=0.12',
@@ -622,9 +624,9 @@ async function closeSystemChat() {
     tl.to(
       contactsRef.value,
       {
-        x: -130,
+        y: -50,
         opacity: 0,
-        duration: 0.28,
+        duration: 0.25,
         ease: 'power2.in',
       },
       '-=0.12',
@@ -830,36 +832,86 @@ watch(
 
 /* === System Chat Wrapper === */
 .sys-chat-wrapper {
+  display: none;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 350px);
+  overflow: hidden;
 }
 
-/* === Contacts Sidebar === */
-.sys-contacts-sidebar {
-  width: 100px;
-  flex-shrink: 0;
-  border-right: 1px solid rgba(90, 79, 64, 0.25);
+.sys-chat-container {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* === Contacts Header (Mobile: horizontal, Desktop: vertical) === */
+.sys-contacts-header {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid rgba(90, 79, 64, 0.25);
   background: rgba(35, 30, 26, 0.4);
+}
+
+/* Desktop: vertical layout (sidebar style) */
+@media (min-width: 640px) {
+  .sys-chat-container {
+    flex-direction: row;
+  }
+
+  .sys-contacts-header {
+    width: 100px;
+    flex-shrink: 0;
+    flex-direction: column;
+    border-bottom: none;
+    border-right: 1px solid rgba(90, 79, 64, 0.25);
+  }
 }
 
 .sys-contacts-title {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   font-size: 9px;
   font-family: monospace;
   letter-spacing: 0.15em;
   color: var(--rust);
   border-bottom: 1px solid rgba(90, 79, 64, 0.2);
   text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .sys-contacts-title {
+    border-bottom: 1px solid rgba(90, 79, 64, 0.2);
+  }
 }
 
 .sys-contacts-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 12px;
+  gap: 8px;
+  justify-content: space-around;
+}
+
+/* Desktop: vertical scroll */
+@media (min-width: 640px) {
+  .sys-contacts-list {
+    flex-wrap: nowrap;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 0;
+    padding: 6px;
+    justify-content: flex-start;
+  }
 }
 
 .sys-contact-card {
@@ -867,12 +919,13 @@ watch(
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 10px 4px;
+  padding: 8px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.25s;
-  margin-bottom: 2px;
+  flex-shrink: 0;
   position: relative;
+  min-width: 56px;
 }
 
 .sys-contact-card:hover {
@@ -886,12 +939,28 @@ watch(
 .sys-contact-active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 15%;
-  bottom: 15%;
-  width: 2px;
   background: var(--rust);
-  border-radius: 0 2px 2px 0;
+  border-radius: 2px;
+}
+
+/* Mobile: top indicator */
+@media (max-width: 639px) {
+  .sys-contact-active::before {
+    left: 15%;
+    right: 15%;
+    top: 0;
+    height: 2px;
+  }
+}
+
+/* Desktop: left indicator */
+@media (min-width: 640px) {
+  .sys-contact-active::before {
+    left: 0;
+    top: 15%;
+    bottom: 15%;
+    width: 2px;
+  }
 }
 
 .sys-contact-avatar {
@@ -948,6 +1017,13 @@ watch(
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 180px;
+}
+
+@media (min-width: 640px) {
+  .sys-chat-main {
+    min-height: 200px;
+  }
 }
 
 .sys-chat-messages {
@@ -957,6 +1033,7 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
 }
 
 .sys-empty-chat {

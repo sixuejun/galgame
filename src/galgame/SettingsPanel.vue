@@ -6,7 +6,10 @@
       @click="store.setOverlay('none')"
     />
 
-    <div class="animate-fade-in-up relative mx-4 w-full max-w-2xl overflow-hidden border" :style="panelStyle">
+    <div
+      class="flex flex-col animate-fade-in-up relative mx-4 w-full max-w-2xl overflow-hidden border"
+      :style="panelStyle"
+    >
       <div :style="decoTopThick" />
       <div :style="decoTopThin" />
 
@@ -30,7 +33,7 @@
       </div>
 
       <!-- Content -->
-      <div class="no-scrollbar overflow-y-auto px-6 py-5" style="max-height: min(600px, calc(100vh - 120px))">
+      <div class="no-scrollbar overflow-y-auto px-6 py-5 flex-1" style="max-height: calc(100vh - 180px)">
         <!-- Volume -->
         <SectionHeader icon="fa-volume-high" title="音量设置" />
         <div class="mb-6 pl-2">
@@ -128,7 +131,7 @@
             <div>
               <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">竖屏模式</span>
               <p style="font-size: 10px; color: var(--vn-muted); margin-top: 2px">
-                开启后支持手势操作，左划/右划快速切换界面
+                画面宽度铺满楼层，高度随宽度按竖屏比例增高（适配 iframe，不使用视口高度单位）
               </p>
             </div>
             <ToggleSwitch
@@ -173,9 +176,13 @@
                 <option value="">选择模型</option>
                 <!-- 已保存的模型不在列表中时显示为独立选项 -->
                 <option
-                  v-if="store.settings.secondApiModel && !store.secondApiModelList.includes(store.settings.secondApiModel)"
+                  v-if="
+                    store.settings.secondApiModel && !store.secondApiModelList.includes(store.settings.secondApiModel)
+                  "
                   :value="store.settings.secondApiModel"
-                >{{ store.settings.secondApiModel }}</option>
+                >
+                  {{ store.settings.secondApiModel }}
+                </option>
                 <option v-for="m in store.secondApiModelList" :key="m" :value="m">{{ m }}</option>
               </select>
               <button
@@ -316,6 +323,19 @@
               <ToggleSwitch
                 :checked="store.settings.imageGenEnabled"
                 @update="v => store.updateSettings({ imageGenEnabled: v })"
+              />
+            </div>
+            <!-- 卡片轮盘开关：独立于生图总开关，随时可开启 -->
+            <div class="flex items-center justify-between py-2">
+              <div>
+                <span class="text-xs" style="color: rgba(212, 197, 160, 0.7)">卡片轮盘</span>
+                <p style="font-size: 10px; color: var(--vn-muted); margin-top: 2px">
+                  显示已生成图片的扇形队列，可随时查看历史
+                </p>
+              </div>
+              <ToggleSwitch
+                :checked="store.settings.imageCardWheelEnabled"
+                @update="v => store.updateSettings({ imageCardWheelEnabled: v })"
               />
             </div>
             <template v-if="store.settings.imageGenEnabled">
@@ -475,9 +495,7 @@ const showApiTaskConfig = ref(false);
 const showWorldbookManager = ref(false);
 
 // 只要 URL 和 Key 已填写就允许测试（不依赖 secondApiStatus 避免降级状态干扰）
-const canTestSecondApi = computed(
-  () => !!(store.settings.secondApiUrl?.trim() && store.settings.secondApiKey?.trim()),
-);
+const canTestSecondApi = computed(() => !!(store.settings.secondApiUrl?.trim() && store.settings.secondApiKey?.trim()));
 
 function refreshPresetList() {
   loadingPresetList.value = true;
@@ -521,10 +539,12 @@ const danmakuDisplayOptions = [
 ];
 
 const panelStyle = {
-  maxHeight: 'min(700px, calc(100vh - 40px))',
+  maxHeight: 'calc(100vh - 80px)',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
+  display: 'flex',
+  flexDirection: 'column',
 };
 const headerBorder = { borderBottom: '1px solid rgba(90,79,64,0.3)' };
 const decoTopThick = {

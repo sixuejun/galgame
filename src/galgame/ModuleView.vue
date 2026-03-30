@@ -77,7 +77,7 @@
         </div>
 
         <!-- Module content -->
-        <div class="overflow-y-auto no-scrollbar" style="max-height: 600px">
+        <div class="overflow-y-auto no-scrollbar flex-1" style="max-height: calc(100vh - 180px)">
           <ShopModule v-if="moduleId === 'shop'" />
           <WorkshopModule v-else-if="moduleId === 'idle_workshop'" />
           <RiddleModule v-else-if="moduleId === 'ai_riddle'" />
@@ -146,30 +146,35 @@ const resolvedMod = computed(() => {
 });
 
 const panelStyle = {
-  maxHeight: '700px',
+  maxHeight: 'calc(100vh - 80px)',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
 };
 
 const puzzle2048Panel = {
-  maxHeight: '700px',
+  maxHeight: 'calc(100vh - 80px)',
   maxWidth: '28rem',
   width: '100%',
   borderColor: 'var(--vn-border)',
   background: 'var(--vn-bg)',
   overflow: 'auto' as const,
+  display: 'flex',
+  flexDirection: 'column',
 };
 
 const boardGamePanel = {
-  maxHeight: '700px',
+  maxHeight: 'calc(100vh - 80px)',
   maxWidth: '900px',
   width: '100%',
   borderColor: 'rgba(90,79,64,0.6)',
   background: 'var(--vn-panel-bg)',
   backdropFilter: 'blur(12px)',
-  display: 'flex' as const,
-  flexDirection: 'column' as const,
+  display: 'flex',
+  flexDirection: 'column',
 };
 
 function handleBackdropClose() {

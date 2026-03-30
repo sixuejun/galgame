@@ -1,6 +1,13 @@
 import { klona } from 'klona';
-import type { MessageBlock } from './types/message';
-import { parseMessageBlocks, extractContentTag, extractPlainTextFromContent } from './utils/messageParser';
+import type { GameEvent } from './boardgame/types';
+import type { ImageTagBlock, MessageBlock } from './types/message';
+import {
+  extractContentTag,
+  extractImageTagBlocks,
+  extractPlainTextFromContent,
+  fuzzyMatchTitle,
+  parseMessageBlocks,
+} from './utils/messageParser';
 import { clearResourceCache } from './utils/worldbookLoader';
 
 // ====== Types ======
@@ -96,7 +103,15 @@ export interface SystemPersonality {
 }
 
 export interface SystemChatMessage {
-  role: 'user' | 'assistant' | 'proactive' | 'divider' | 'riddle_divider' | 'riddle_start' | 'riddle_end_pending' | 'riddle_end';
+  role:
+    | 'user'
+    | 'assistant'
+    | 'proactive'
+    | 'divider'
+    | 'riddle_divider'
+    | 'riddle_start'
+    | 'riddle_end_pending'
+    | 'riddle_end';
   text: string;
 }
 
@@ -114,6 +129,8 @@ export interface ImageCard {
   imageData: string;
   type: 'background' | 'cg';
   timestamp: number;
+  prompt?: string; // 保存生成时的提示词，用于重试
+  title?: string; // 保存标题，用于显示
 }
 
 // ====== Worldbook Enhancement Types ======
@@ -160,6 +177,7 @@ const VNSettings = z
     imageGenEnabled: z.boolean().default(false),
     backgroundGenEnabled: z.boolean().default(false),
     cgGenEnabled: z.boolean().default(false),
+    imageCardWheelEnabled: z.boolean().default(true), // 卡片轮盘开关（默认开启）
     imageGenPriority: z.enum(['cg', 'background']).default('cg'),
     // API task config
     apiTaskDanmaku: z.enum(['main', 'second', 'disabled']).default('second'),
@@ -730,6 +748,7 @@ export const useVNStore = defineStore('vn', () => {
     danmaku: false,
     imageGen: false,
     shop: false,
+    boardGameEvent: false,
     // riddle 和 system 任务不使用预设，无需任务控制变量
   });
 
@@ -746,6 +765,7 @@ export const useVNStore = defineStore('vn', () => {
         vn_task_danmaku: secondApiTaskControl.value.danmaku,
         vn_task_imageGen: secondApiTaskControl.value.imageGen,
         vn_task_shop: secondApiTaskControl.value.shop,
+        vn_task_boardGameEvent: secondApiTaskControl.value.boardGameEvent,
         // riddle 和 system 任务不使用预设，无需同步变量
       },
       { type: 'chat' },
@@ -777,7 +797,7 @@ export const useVNStore = defineStore('vn', () => {
       // 提取剧情纯文本并同步到酒馆变量，供 {{getvar::剧情文本}} 使用
       const plainText = extractPlainTextFromContent(message);
       if (plainText) {
-        insertOrAssignVariables({ '剧情文本': plainText }, { type: 'chat' });
+        insertOrAssignVariables({ 剧情文本: plainText }, { type: 'chat' });
         console.info('[剧情文本] 已更新剧情文本变量');
       }
 
@@ -958,18 +978,370 @@ export const useVNStore = defineStore('vn', () => {
   // --- 生图（事件通信）---
   const stageBackgroundImage = ref<string | null>(null);
   const stageCgImage = ref<string | null>(null);
-  const pendingImageRequests = new Map<string, { type: 'background' | 'cg' }>();
   let imageGenListenerStopped: (() => void) | null = null;
 
   // 图片卡牌队列（最多10张）
   const imageCardQueue = ref<ImageCard[]>([]);
   const MAX_IMAGE_CARDS = 10;
+  // 记录正在生成的请求
+  const activeImageRequests = new Map<string, { type: 'background' | 'cg'; prompt?: string; title?: string }>();
+
+  // --- 图像标签解析与手动覆盖 ---
+  // 当前显示的图片标题（用于判断 title 变化）
+  const currentImageTitle = ref<string | null>(null);
+  // 当前显示的图片类型（用于判断类型变化）
+  const currentImageType = ref<'background' | 'cg' | null>(null);
+  // 用户强制覆盖状态：记录被手动选中的卡牌 ID
+  const manualOverrideCardId = ref<string | null>(null);
+
+  // --- 重试弹窗状态 ---
+  const retryPanelOpen = ref(false);
+  // 重试模式：'both' | 'background' | 'cg'
+  const retryMode = ref<'both' | 'background' | 'cg'>('background');
+  // 弹窗内当前激活的标签页（仅在 both 模式下有效）
+  const retryActiveTab = ref<'background' | 'cg'>('background');
+  const retryGeneratedImages = ref<
+    Array<{
+      tempId: string;
+      requestId: string;
+      imageData: string;
+      status: 'generating' | 'done' | 'error';
+      errorMsg?: string;
+    }>
+  >([]);
+  const retrySelectedIndices = ref<Set<number>>(new Set());
+  // 分别记录背景和 CG 的提示词
+  const lastRetryPrompt = ref<{ background?: string; cg?: string }>({});
+  // 仅属于当前重试会话的请求 ID（用于过滤响应）
+  const retryActiveRequestIds = new Set<string>();
+
+  /**
+   * 打开重试弹窗：
+   * - 从最新消息中解析 <background> 和 <image> 标签
+   * - 自动判断生成模式（both / bg / cg）并预填提示词
+   */
+  function openRetryPanel() {
+    console.info('[RetryPanel] openRetryPanel 被调用');
+    // 获取最新消息楼层并提取图像标签
+    let bgPrompt = '';
+    let cgPrompt = '';
+
+    try {
+      const messages = getChatMessages('latest');
+      if (messages && messages.length > 0) {
+        const latestMsg = messages[messages.length - 1]?.message ?? '';
+        const blocks = extractImageTagBlocks(latestMsg);
+        for (const block of blocks) {
+          if (block.type === 'background') {
+            bgPrompt = block.prompt;
+          } else {
+            cgPrompt = block.prompt;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[RetryPanel] 解析最新消息失败:', e);
+    }
+
+    // 回退：从 imageCardQueue 末尾取最近的对应类型提示词
+    if (!bgPrompt) {
+      const lastBgCard = [...imageCardQueue.value].reverse().find(c => c.type === 'background');
+      if (lastBgCard) bgPrompt = lastBgCard.prompt ?? '';
+    }
+    if (!cgPrompt) {
+      const lastCgCard = [...imageCardQueue.value].reverse().find(c => c.type === 'cg');
+      if (lastCgCard) cgPrompt = lastCgCard.prompt ?? '';
+    }
+
+    // 判断模式
+    const hasBg = !!bgPrompt.trim();
+    const hasCg = !!cgPrompt.trim();
+    if (hasBg && hasCg) {
+      retryMode.value = 'both';
+      retryActiveTab.value = 'background';
+    } else if (hasCg) {
+      retryMode.value = 'cg';
+      retryActiveTab.value = 'cg';
+    } else {
+      retryMode.value = 'background';
+    }
+
+    lastRetryPrompt.value = { background: bgPrompt, cg: cgPrompt };
+    retryPanelOpen.value = true;
+    retryGeneratedImages.value = [];
+    retrySelectedIndices.value = new Set();
+    console.info(
+      '[RetryPanel] 弹窗已打开, mode=',
+      retryMode.value,
+      'bgPrompt=',
+      bgPrompt.substring(0, 50),
+      'cgPrompt=',
+      cgPrompt.substring(0, 50),
+    );
+  }
+
+  /**
+   * 在重试弹窗中追加一张图片生成请求
+   * 不改变 imageCardQueue（由 confirmRetryImages 统一插入）
+   */
+  function addRetryImageRequest(prompt: string, type: 'background' | 'cg') {
+    // 先生成 ID 并注册，避免响应早于 ID 入集合而漏拦截
+    const requestId = 'vn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
+    activeImageRequests.set(requestId, { type, prompt });
+    retryActiveRequestIds.add(requestId);
+
+    const tempId = `retry-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    retryGeneratedImages.value.push({ tempId, requestId, imageData: '', status: 'generating' });
+    const entryIndex = retryGeneratedImages.value.length - 1;
+
+    let cleanedUp = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      if (timeout) clearTimeout(timeout);
+      retryActiveRequestIds.delete(requestId);
+      activeImageRequests.delete(requestId);
+      if (window.eventRemoveListener) {
+        window.eventRemoveListener(ImageGenEventType.GENERATE_IMAGE_RESPONSE, handler);
+      }
+    };
+
+    const handler = (data: unknown) => {
+      if (cleanedUp) return;
+      const resp = data as ImageGenResponseData;
+      if (!resp.id) return;
+      // 只处理属于本次重试会话的响应
+      if (!retryActiveRequestIds.has(resp.id)) return;
+
+      cleanup();
+
+      const entry = retryGeneratedImages.value[entryIndex];
+      if (entry && entry.status === 'generating') {
+        if (resp.success && resp.imageData) {
+          entry.imageData = resp.imageData;
+          entry.status = 'done';
+        } else {
+          entry.status = 'error';
+          entry.errorMsg = resp.error ?? '生成失败';
+        }
+      }
+    };
+
+    if (window.eventOn) {
+      window.eventOn(ImageGenEventType.GENERATE_IMAGE_RESPONSE, handler);
+      // 发请求（requestId 已在 emit 之前注册好）
+      const requestData: ImageGenRequestData = {
+        id: requestId,
+        prompt,
+        width: null,
+        height: null,
+      };
+      if (window.eventEmit) {
+        window.eventEmit(ImageGenEventType.GENERATE_IMAGE_REQUEST, requestData);
+      }
+      lastRetryPrompt.value[type] = prompt;
+      // 超时兜底
+      timeout = setTimeout(() => {
+        cleanup();
+        const entry = retryGeneratedImages.value[entryIndex];
+        if (entry?.status === 'generating') {
+          entry.status = 'error';
+          entry.errorMsg = '超时';
+        }
+      }, 60000);
+    }
+  }
+
+  /**
+   * 切换选中状态
+   */
+  function toggleRetryImageSelection(index: number) {
+    const s = retrySelectedIndices.value;
+    if (s.has(index)) s.delete(index);
+    else s.add(index);
+  }
+
+  /**
+   * 设置当前激活的标签页（仅在 both 模式下有效）
+   */
+  function setRetryActiveTab(tab: 'background' | 'cg') {
+    retryActiveTab.value = tab;
+  }
+
+  /**
+   * 清空选中状态
+   */
+  function clearRetrySelection() {
+    retrySelectedIndices.value = new Set();
+  }
+
+  /**
+   * 确认插入：选中的图插入 imageCardQueue 并显示在舞台上
+   */
+  function confirmRetryImages() {
+    const stageType = retryMode.value === 'both' ? retryActiveTab.value : retryMode.value;
+    if (!stageType) {
+      closeRetryPanel();
+      return;
+    }
+
+    const generated = retryGeneratedImages.value;
+    const selected = retrySelectedIndices.value;
+
+    if (selected.size === 0) {
+      closeRetryPanel();
+      return;
+    }
+
+    for (const idx of selected) {
+      const img = generated[idx];
+      if (!img || img.status !== 'done' || !img.imageData) continue;
+      imageCardQueue.value.push({
+        id: img.tempId,
+        imageData: img.imageData,
+        type: stageType,
+        timestamp: Date.now(),
+        prompt: lastRetryPrompt.value[stageType] ?? '',
+        title: '',
+      });
+    }
+
+    const firstIdx = [...selected][0];
+    const firstImg = generated[firstIdx];
+    if (firstImg?.status === 'done') {
+      switchToImageCard(firstImg.tempId);
+    }
+
+    closeRetryPanel();
+  }
+
+  /**
+   * 关闭弹窗并清理
+   */
+  function closeRetryPanel() {
+    retryActiveRequestIds.clear();
+    retryPanelOpen.value = false;
+    retryGeneratedImages.value = [];
+    retrySelectedIndices.value = new Set();
+    retryMode.value = 'background';
+    retryActiveTab.value = 'background';
+  }
+
+  /**
+   * 清除 manualOverride（当 title 或类型变化时调用）
+   * @param newTitle 新的 title（可选）
+   * @param newType 新的类型（可选）
+   */
+  function clearManualOverride(newTitle?: string, newType?: 'background' | 'cg') {
+    if (manualOverrideCardId.value !== null) {
+      console.info('[ImageGen] 清除 manualOverride', {
+        旧Title: currentImageTitle.value,
+        新Title: newTitle,
+        旧Type: currentImageType.value,
+        新Type: newType,
+      });
+    }
+    manualOverrideCardId.value = null;
+    if (newTitle !== undefined) currentImageTitle.value = newTitle;
+    if (newType !== undefined) currentImageType.value = newType;
+  }
+
+  /**
+   * 获取当前应该显示的背景图片
+   * 优先使用 manualOverride 卡牌，否则使用 stageBackgroundImage
+   */
+  function getCurrentDisplayBackground(): string | null {
+    if (manualOverrideCardId.value !== null) {
+      const card = imageCardQueue.value.find(c => c.id === manualOverrideCardId.value && c.type === 'background');
+      if (card) return card.imageData;
+    }
+    return stageBackgroundImage.value;
+  }
+
+  /**
+   * 获取当前应该显示的 CG 图片
+   * 优先使用 manualOverride 卡牌，否则使用 stageCgImage
+   */
+  function getCurrentDisplayCg(): string | null {
+    if (manualOverrideCardId.value !== null) {
+      const card = imageCardQueue.value.find(c => c.id === manualOverrideCardId.value && c.type === 'cg');
+      if (card) return card.imageData;
+    }
+    return stageCgImage.value;
+  }
+
+  /**
+   * 处理图像标签块：生图并加入队列
+   * @param blocks 解析出的图像标签块数组
+   */
+  async function processImageTagBlocks(blocks: ImageTagBlock[]): Promise<void> {
+    for (const block of blocks) {
+      // 1. 检查 title 或类型是否变化
+      const titleChanged = currentImageTitle.value !== null && !fuzzyMatchTitle(currentImageTitle.value, block.title);
+      const typeChanged = currentImageType.value !== null && currentImageType.value !== block.type;
+
+      if (titleChanged || typeChanged) {
+        // 变化了：清除 manualOverride，更新当前显示
+        clearManualOverride(block.title, block.type);
+      } else if (!manualOverrideCardId.value) {
+        // 无覆盖且无变化：只更新 title/type 记录
+        currentImageTitle.value = block.title;
+        currentImageType.value = block.type;
+      } else {
+        // 有覆盖：只更新记录，不切换显示
+        currentImageTitle.value = block.title;
+        currentImageType.value = block.type;
+      }
+
+      // 2. 检查卡牌队列是否已有相同 prompt 的图片
+      const existing = imageCardQueue.value.find(c => c.prompt === block.prompt);
+      if (existing) {
+        console.info('[ImageGen] 使用已有图片:', block.title);
+        // 更新当前显示（即使有 manualOverride，也更新 stageBackgroundImage/stageCgImage）
+        if (block.type === 'background') {
+          stageBackgroundImage.value = existing.imageData;
+        } else {
+          stageCgImage.value = existing.imageData;
+        }
+        continue;
+      }
+
+      // 3. 发送生图请求
+      if (block.type === 'background') {
+        requestBackgroundImage(block.prompt, block.title);
+      } else {
+        requestCgImage(block.prompt, block.title);
+      }
+    }
+  }
+
+  /**
+   * 从酒馆消息系统重新解析并处理图像标签块
+   * 用于测试控制台等场景，模拟 AI 生成消息后的完整流程
+   */
+  async function reparseImageTagsFromMessage(messageId: number): Promise<void> {
+    const messages = getChatMessages(messageId);
+    if (messages.length === 0) return;
+    const raw = messages[0]?.message ?? '';
+    const blocks = extractImageTagBlocks(raw);
+    if (blocks.length > 0) {
+      console.info('[ImageGen] 重新解析图像标签:', blocks);
+      await processImageTagBlocks(blocks);
+    }
+  }
 
   function handleImageResponse(responseData: ImageGenResponseData) {
     if (!responseData || !responseData.id) return;
-    const pending = pendingImageRequests.get(responseData.id);
+
+    // Retry 弹窗发起的请求由 addRetryImageRequest 的 handler 单独处理，
+    // 此处跳过避免图片重复入库（进卡牌队列 & 进 retry 面板）
+    if (retryActiveRequestIds.has(responseData.id)) return;
+
+    const pending = activeImageRequests.get(responseData.id);
     if (!pending) return;
-    pendingImageRequests.delete(responseData.id);
+    activeImageRequests.delete(responseData.id);
     if (responseData.success && responseData.imageData) {
       // 添加到卡牌队列
       const card: ImageCard = {
@@ -977,53 +1349,91 @@ export const useVNStore = defineStore('vn', () => {
         imageData: responseData.imageData,
         type: pending.type,
         timestamp: Date.now(),
+        prompt: pending.prompt, // 保存提示词用于重试
+        title: pending.title, // 保存标题用于显示
       };
       imageCardQueue.value.push(card);
       if (imageCardQueue.value.length > MAX_IMAGE_CARDS) {
         imageCardQueue.value.shift();
       }
 
-      // 同时更新舞台显示
-      if (pending.type === 'background') stageBackgroundImage.value = responseData.imageData;
-      else stageCgImage.value = responseData.imageData;
+      // 如果当前没有 manualOverride，则更新舞台显示
+      if (!manualOverrideCardId.value) {
+        if (pending.type === 'background') stageBackgroundImage.value = responseData.imageData;
+        else stageCgImage.value = responseData.imageData;
+      }
     }
   }
 
   function setupImageGenListener() {
     if (imageGenListenerStopped) return;
-    const ret = eventOn(ImageGenEventType.GENERATE_IMAGE_RESPONSE, handleImageResponse);
-    imageGenListenerStopped = ret.stop;
+    const responseHandler = (data: unknown) => {
+      handleImageResponse(data as ImageGenResponseData);
+    };
+    if (window.eventRemoveListener) {
+      window.eventRemoveListener(ImageGenEventType.GENERATE_IMAGE_RESPONSE, responseHandler);
+    }
+    if (window.eventOn) {
+      window.eventOn(ImageGenEventType.GENERATE_IMAGE_RESPONSE, responseHandler);
+      imageGenListenerStopped = () => {
+        if (window.eventRemoveListener) {
+          window.eventRemoveListener(ImageGenEventType.GENERATE_IMAGE_RESPONSE, responseHandler);
+        }
+      };
+    }
   }
 
-  function requestImage(prompt: string, type: 'background' | 'cg') {
+  function requestImage(prompt: string, type: 'background' | 'cg', title?: string) {
     if (!settings.value.imageGenEnabled) return;
     if (type === 'background' && !settings.value.backgroundGenEnabled) return;
     if (type === 'cg' && !settings.value.cgGenEnabled) return;
     const requestId = 'vn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
-    pendingImageRequests.set(requestId, { type });
+    activeImageRequests.set(requestId, { type, prompt, title });
     const requestData: ImageGenRequestData = {
       id: requestId,
       prompt,
       width: null,
       height: null,
     };
-    eventEmit(ImageGenEventType.GENERATE_IMAGE_REQUEST, requestData);
+    if (window.eventEmit) {
+      window.eventEmit(ImageGenEventType.GENERATE_IMAGE_REQUEST, requestData);
+    }
   }
 
-  function requestBackgroundImage(prompt: string) {
-    requestImage(prompt, 'background');
+  // 重试生成指定卡片的图片
+  function retryImageCard(cardId: string) {
+    const card = imageCardQueue.value.find(c => c.id === cardId);
+    if (!card || !card.prompt) return;
+    // 从队列中移除旧卡片
+    imageCardQueue.value = imageCardQueue.value.filter(c => c.id !== cardId);
+    // 重新生成
+    requestImage(card.prompt, card.type);
   }
 
-  function requestCgImage(prompt: string) {
-    requestImage(prompt, 'cg');
+  // 获取当前正在生成中的请求
+  function getActiveImageRequest() {
+    const entries = Array.from(activeImageRequests.entries());
+    return entries.length > 0 ? { id: entries[0][0], ...entries[0][1] } : null;
   }
 
-  // 切换卡牌显示到舞台
+  function requestBackgroundImage(prompt: string, title?: string) {
+    requestImage(prompt, 'background', title);
+  }
+
+  function requestCgImage(prompt: string, title?: string) {
+    requestImage(prompt, 'cg', title);
+  }
+
+  // 切换卡牌显示到舞台，并设置 manualOverride
   function switchToImageCard(cardId: string) {
     const card = imageCardQueue.value.find(c => c.id === cardId);
     if (!card) return;
+    // 设置 manualOverride
+    manualOverrideCardId.value = cardId;
+    // 更新显示
     if (card.type === 'background') stageBackgroundImage.value = card.imageData;
     else stageCgImage.value = card.imageData;
+    console.info('[ImageGen] 设置 manualOverride:', cardId, card.title);
   }
 
   // 清空卡牌队列
@@ -1042,7 +1452,7 @@ export const useVNStore = defineStore('vn', () => {
 
   // --- Second API unified entry ---
   async function callSecondApi(
-    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'imageTag' | 'danmakuAndImageGen',
+    task: 'danmaku' | 'shop' | 'system' | 'riddle' | 'imageTag' | 'danmakuAndImageGen' | 'boardGameEvent',
     payload: SecondApiPayload,
   ): Promise<string[] | ShopItem[] | string> {
     const url = settings.value.secondApiUrl?.trim();
@@ -1058,10 +1468,13 @@ export const useVNStore = defineStore('vn', () => {
 
     // 构建 ordered_prompts，不再硬编码提示词，完全依赖预设中的 EJS
     const danmakuPayload = payload as DanmakuPayload;
+    const boardGameEventPayload = payload as BoardGameEventPayload;
     const ordered_prompts: { role: 'system' | 'assistant' | 'user'; content: string }[] =
       task === 'danmaku' || task === 'danmakuAndImageGen'
         ? [{ role: 'user', content: danmakuPayload.contentText }]
-        : (payload as RiddlePayload).ordered_prompts || [];
+        : task === 'boardGameEvent'
+          ? [{ role: 'user', content: boardGameEventPayload.contentText }]
+          : (payload as RiddlePayload).ordered_prompts || [];
 
     // 猜谜和系统聊天任务不使用预设，直接用代码中构造的提示词
     const usePreset = presetName && task !== 'riddle' && task !== 'system';
@@ -1095,6 +1508,8 @@ export const useVNStore = defineStore('vn', () => {
       secondApiTaskControl.value.imageGen = true;
     } else if (task === 'shop') {
       secondApiTaskControl.value.shop = true;
+    } else if (task === 'boardGameEvent') {
+      secondApiTaskControl.value.boardGameEvent = true;
     } else if (task === 'danmakuAndImageGen') {
       // 弹幕和生图合并调用，同时开启两个开关
       secondApiTaskControl.value.danmaku = true;
@@ -1131,7 +1546,9 @@ export const useVNStore = defineStore('vn', () => {
     // 调试日志：输出完整提示词
     console.info(`[SecondAPI] === 任务: ${task} ===`);
     ordered_prompts.forEach((p, i) => {
-      console.info(`[SecondAPI] [${i}] ${p.role.toUpperCase()}: ${p.content.slice(0, 200)}${p.content.length > 200 ? '...' : ''}`);
+      console.info(
+        `[SecondAPI] [${i}] ${p.role.toUpperCase()}: ${p.content.slice(0, 200)}${p.content.length > 200 ? '...' : ''}`,
+      );
     });
 
     // 过滤世界书条目，仅保留 targetApi 为 'second' 或 'both' 的条目
@@ -1373,11 +1790,6 @@ export const useVNStore = defineStore('vn', () => {
         console.warn(`[Worldbook] Failed to update auto-control for "${name}":`, e);
       }
     }
-  }
-
-  /** @deprecated Use filterAndApplyWorldbookForSecondApi instead */
-  function filterWorldbookForApi(_apiType: 'main' | 'second') {
-    return null;
   }
 
   // ====== Worldbook API Filtering for Second API ======
@@ -1893,9 +2305,7 @@ export const useVNStore = defineStore('vn', () => {
     const personalityPrompt = personality?.systemPrompt ?? '你是一个助手。';
 
     // 构造系统提示词：包含角色设定、猜谜规则、聊天记录、最新提示
-    const chatLogText = hist
-      .map(m => m.role === 'ai' ? `对方：${m.text}` : `你：${m.text}`)
-      .join('\n');
+    const chatLogText = hist.map(m => (m.role === 'ai' ? `对方：${m.text}` : `你：${m.text}`)).join('\n');
     const latestHint = hist.length > 0 ? hist[hist.length - 1]!.text : '';
 
     const systemPromptContent = `${personalityPrompt}
@@ -2002,6 +2412,184 @@ ${latestHint}
     addInventoryItem({ id: item.id, name: item.name, effect: item.effect });
     shopItems.value = shopItems.value.filter(i => i.id !== itemId);
     return true;
+  }
+
+  // ====== Board Game Event Generation ======
+
+  /**
+   * 生成废土行路事件（供 boardGameStore 预生成调用）
+   * 返回 Promise<GameEvent | null>
+   *
+   * 适配新的 AI 生成格式：AI 返回 9-12 张事件卡，每张卡包含
+   * title, description, tendency, effect, hp, sanity
+   * 函数将这些卡牌组合成 2-3 个完整事件（每个事件 2-4 张卡供选择）
+   */
+  async function generateBoardGameEvent(nodeType: string, generationId: string): Promise<GameEvent | null> {
+    if (secondApiStatus.value === 'disabled') {
+      console.warn('[BoardGame] 第二 API 未配置，跳过事件生成');
+      return null;
+    }
+
+    // 获取当前场景
+    const sceneText = currentScene.value || '未知场景';
+
+    // 确定事件倾向提示
+    let tendencyHint = '';
+    if (nodeType === 'trap') {
+      tendencyHint = '负面/危险（偏损失，如危险区域、误触装置、埋伏、污染、人员失散、地形风险等）';
+    } else if (nodeType === 'fortune') {
+      tendencyHint = '正面/有利（偏收益，如补给、捷径、情报、可利用资源、成功逃脱、意外相遇等）';
+    } else if (nodeType === 'encounter') {
+      tendencyHint = '中性/不确定（带随机性或风险交换，如遇见新的人物、动物、势力、异常现象、临时交易、求助、对峙等）';
+    }
+
+    // 构建用户输入内容（供预设中的 EJS 使用）
+    const contentText = `当前场景：${sceneText}\n事件类型：${nodeType}\n事件倾向：${tendencyHint}`;
+
+    try {
+      const raw = (await callSecondApi('boardGameEvent', { contentText })) as string;
+
+      // 解析 JSON
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.warn('[BoardGame] AI返回格式错误，未找到JSON数据');
+        return null;
+      }
+
+      const eventData = JSON.parse(jsonMatch[0]);
+
+      // 检查是否是新的卡片数组格式
+      let cards: any[] = [];
+      if (Array.isArray(eventData)) {
+        // 新格式：直接是卡片数组
+        cards = eventData;
+      } else if (Array.isArray(eventData.cards)) {
+        // 旧格式：{ title, flavor, cards: [...] }
+        const gameEvent: GameEvent = {
+          id: generationId || `ai_${Date.now()}`,
+          nodeType: nodeType as any,
+          title: eventData.title || '未知事件',
+          flavor: eventData.flavor || '',
+          cards: eventData.cards.map((card: any, idx: number) => ({
+            id: `${generationId}_card_${idx}`,
+            title: card.title || '未知选项',
+            description: card.description || '',
+            tendency: card.tendency || 'neutral',
+            effect: {
+              message: card.effect || '',
+              hp: card.hp,
+              sanity: card.sanity,
+              transfer: card.transfer,
+            },
+          })),
+        };
+        console.info('[BoardGame] 事件生成成功:', gameEvent.title);
+        return gameEvent;
+      }
+
+      if (cards.length === 0) {
+        console.warn('[BoardGame] AI返回格式错误，未找到卡片数据');
+        return null;
+      }
+
+      // 将卡片分组为 2-3 个事件
+      // 按倾向分组，确保每个事件有多张卡供选择
+      const groupedEvents = groupCardsIntoEvents(cards, generationId, nodeType as any);
+
+      // 选择第一个事件返回
+      const selectedEvent = groupedEvents[0];
+      if (!selectedEvent) {
+        console.warn('[BoardGame] 事件分组失败');
+        return null;
+      }
+
+      console.info('[BoardGame] 事件生成成功:', selectedEvent.title);
+      return selectedEvent;
+    } catch (e) {
+      console.error('[BoardGame] 事件生成失败:', e);
+      return null;
+    }
+  }
+
+  /**
+   * 将卡片数组分组为多个事件
+   * 每个事件包含 2-4 张卡牌供玩家选择
+   */
+  function groupCardsIntoEvents(cards: any[], generationId: string, nodeType: any): GameEvent[] {
+    // 打乱卡片顺序
+    const shuffled = [...cards].sort(() => Math.random() - 0.5);
+
+    // 按倾向分组
+    const negativeCards = shuffled.filter((c: any) => c.tendency === 'negative');
+    const positiveCards = shuffled.filter((c: any) => c.tendency === 'positive');
+    const neutralCards = shuffled.filter((c: any) => c.tendency === 'neutral');
+    const otherCards = shuffled.filter((c: any) => !['negative', 'positive', 'neutral'].includes(c.tendency));
+
+    const events: GameEvent[] = [];
+    let eventIdCounter = 0;
+
+    // 构建事件1：至少包含负面的选项
+    const event1Cards: any[] = [];
+    if (negativeCards.length > 0) event1Cards.push(negativeCards[0]);
+    if (neutralCards.length > 0) event1Cards.push(neutralCards[0]);
+    if (positiveCards.length > 0) event1Cards.push(positiveCards[0]);
+    if (otherCards.length > 0) event1Cards.push(otherCards[0]);
+
+    if (event1Cards.length >= 2) {
+      events.push(
+        createGameEventFromCards(`${generationId}_event_${eventIdCounter++}`, event1Cards.slice(0, 3), nodeType),
+      );
+    }
+
+    // 构建事件2：包含剩余卡片
+    const remainingCards = shuffled.filter((c: any) => !event1Cards.slice(0, 3).includes(c));
+    if (remainingCards.length >= 2) {
+      events.push(
+        createGameEventFromCards(`${generationId}_event_${eventIdCounter++}`, remainingCards.slice(0, 4), nodeType),
+      );
+    }
+
+    // 如果事件不足2个，尝试合并
+    if (events.length < 2 && shuffled.length >= 2) {
+      events.push(
+        createGameEventFromCards(
+          `${generationId}_event_${eventIdCounter}`,
+          shuffled.slice(0, Math.min(4, shuffled.length)),
+          nodeType,
+        ),
+      );
+    }
+
+    return events;
+  }
+
+  /**
+   * 从卡片数组创建 GameEvent
+   */
+  function createGameEventFromCards(eventId: string, cards: any[], nodeType: any): GameEvent {
+    // 使用第一张卡的信息构建事件标题和描述
+    const firstCard = cards[0];
+    const eventTitle = firstCard.title || '未知事件';
+    const eventFlavor = firstCard.description || '';
+
+    return {
+      id: eventId,
+      nodeType,
+      title: eventTitle,
+      flavor: eventFlavor,
+      cards: cards.map((card: any, idx: number) => ({
+        id: `${eventId}_card_${idx}`,
+        title: card.title || '未知选项',
+        description: card.description || '',
+        tendency: card.tendency || 'neutral',
+        effect: {
+          message: card.effect || '',
+          hp: typeof card.hp === 'number' ? card.hp : 0,
+          sanity: typeof card.sanity === 'number' ? card.sanity : 0,
+          transfer: false,
+        },
+      })),
+    };
   }
 
   // ====== Danmaku ======
@@ -2281,6 +2869,31 @@ ${latestHint}
     requestCgImage,
     switchToImageCard,
     clearImageCardQueue,
+    retryImageCard,
+    getActiveImageRequest,
+    // Image tag parsing & manual override
+    currentImageTitle,
+    currentImageType,
+    manualOverrideCardId,
+    clearManualOverride,
+    processImageTagBlocks,
+    reparseImageTagsFromMessage,
+    getCurrentDisplayBackground,
+    getCurrentDisplayCg,
+    // Retry panel
+    retryPanelOpen,
+    retryMode,
+    retryActiveTab,
+    retryGeneratedImages,
+    retrySelectedIndices,
+    lastRetryPrompt,
+    openRetryPanel,
+    addRetryImageRequest,
+    toggleRetryImageSelection,
+    clearRetrySelection,
+    confirmRetryImages,
+    closeRetryPanel,
+    setRetryActiveTab,
     getModuleLockReason,
     userCharacter,
     characterRoster,
@@ -2351,6 +2964,7 @@ ${latestHint}
     shopRefreshing,
     refreshShop,
     purchaseShopItem,
+    generateBoardGameEvent,
     danmakuItems,
     pushDanmaku,
     removeDanmaku,

@@ -148,9 +148,10 @@ const danmakuHeight = computed(() => {
   return m === 'full' ? '100%' : m === 'half' ? '50%' : '33%';
 });
 
-// 当前显示的资源
+// 当前显示的资源（支持 manualOverride）
 const currentBackgroundImage = computed(() => {
-  return store.currentBlock?.sceneImageUrl || store.stageBackgroundImage;
+  // 优先使用消息块中的场景图，其次使用 store 的生成图或 manualOverride 图
+  return store.currentBlock?.sceneImageUrl || store.getCurrentDisplayBackground();
 });
 
 const currentSpriteImage = computed(() => {
@@ -158,7 +159,8 @@ const currentSpriteImage = computed(() => {
 });
 
 const currentCgImage = computed(() => {
-  return store.currentBlock?.cgImageUrl || store.stageCgImage;
+  // 优先使用消息块中的 CG 图，其次使用 store 的生成图或 manualOverride 图
+  return store.currentBlock?.cgImageUrl || store.getCurrentDisplayCg();
 });
 </script>
 
